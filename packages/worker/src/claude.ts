@@ -4,7 +4,9 @@ export async function generateSnippets(
   pois: RawPOI[],
   apiKey: string
 ): Promise<Landmark[]> {
-  const nameList = pois.map((p) => `- ${p.name} (${p.type})`).join('\n');
+  // Sanitize POI names to prevent prompt injection
+  const sanitize = (s: string) => s.replace(/[^\w\s\-'.,&()]/g, '').slice(0, 100);
+  const nameList = pois.map((p) => `- ${sanitize(p.name)} (${sanitize(p.type)})`).join('\n');
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
