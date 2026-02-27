@@ -6,7 +6,11 @@ import { Bindings } from './types';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
-app.use('/*', cors());
+app.use('/*', async (c, next) => {
+  const origin = c.env.ALLOWED_ORIGIN || '*';
+  const middleware = cors({ origin });
+  return middleware(c, next);
+});
 
 app.post('/api/landmarks', async (c) => {
   const body = await c.req.json();

@@ -2,6 +2,7 @@ node_modules/
 dist/
 .dev.vars
 .env
+.env.*
 .wrangler/
 *.ehpk
 .DS_Store
