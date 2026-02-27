@@ -1,11 +1,17 @@
+import {
+  CreateStartUpPageContainer,
+  RebuildPageContainer,
+  TextContainerProperty,
+  TextContainerUpgrade,
+} from '@evenrealities/even_hub_sdk';
 import { getBridge } from './bridge';
 import { AppState, Landmark } from './types';
 import { DISPLAY_WIDTH, DISPLAY_HEIGHT, HEADER_HEIGHT, FOOTER_HEIGHT, VISIBLE_LANDMARKS } from './constants';
 
 const LIST_HEIGHT = DISPLAY_HEIGHT - HEADER_HEIGHT - FOOTER_HEIGHT;
 
-function makeHeader(text: string) {
-  return {
+function makeHeader(text: string): TextContainerProperty {
+  return new TextContainerProperty({
     containerID: 1,
     containerName: 'header',
     xPosition: 0,
@@ -14,15 +20,15 @@ function makeHeader(text: string) {
     height: HEADER_HEIGHT,
     borderWidth: 1,
     borderColor: 8,
-    borderRdaius: 0, // SDK typo is intentional
+    borderRdaius: 0,
     paddingLength: 4,
     content: text,
     isEventCapture: 0,
-  };
+  });
 }
 
-function makeContent(text: string) {
-  return {
+function makeContent(text: string): TextContainerProperty {
+  return new TextContainerProperty({
     containerID: 2,
     containerName: 'content',
     xPosition: 0,
@@ -35,11 +41,11 @@ function makeContent(text: string) {
     paddingLength: 4,
     content: text,
     isEventCapture: 1,
-  };
+  });
 }
 
-function makeFooter(text: string) {
-  return {
+function makeFooter(text: string): TextContainerProperty {
+  return new TextContainerProperty({
     containerID: 3,
     containerName: 'footer',
     xPosition: 0,
@@ -52,7 +58,7 @@ function makeFooter(text: string) {
     paddingLength: 4,
     content: text,
     isEventCapture: 0,
-  };
+  });
 }
 
 function formatDistance(meters: number): string {
@@ -85,14 +91,14 @@ export function formatLandmarkList(landmarks: Landmark[], selectedIndex: number)
 
 export async function renderStartup(): Promise<void> {
   const bridge = getBridge();
-  await bridge.createStartUpPageContainer({
+  await bridge.createStartUpPageContainer(new CreateStartUpPageContainer({
     containerTotalNum: 3,
     textObject: [
       makeHeader('Landmark Explorer'),
       makeContent('Getting your location...'),
       makeFooter('Please wait'),
     ],
-  });
+  }));
 }
 
 export async function renderList(state: AppState): Promise<void> {
@@ -100,40 +106,40 @@ export async function renderList(state: AppState): Promise<void> {
   const total = state.landmarks.length;
   const current = state.selectedIndex + 1;
 
-  await bridge.rebuildPageContainer({
+  await bridge.rebuildPageContainer(new RebuildPageContainer({
     containerTotalNum: 3,
     textObject: [
       makeHeader(`Nearby Landmarks          ${current}/${total}`),
       makeContent(formatLandmarkList(state.landmarks, state.selectedIndex)),
       makeFooter('Scroll: browse  Tap: details'),
     ],
-  });
+  }));
 }
 
 export async function renderDetail(landmark: Landmark): Promise<void> {
   const bridge = getBridge();
   const dist = formatDistance(landmark.distance);
 
-  await bridge.rebuildPageContainer({
+  await bridge.rebuildPageContainer(new RebuildPageContainer({
     containerTotalNum: 3,
     textObject: [
       makeHeader(`${truncate(landmark.name, 35)}  ${dist}`),
       makeContent(landmark.snippet),
       makeFooter('Tap: back to list'),
     ],
-  });
+  }));
 }
 
 export async function renderError(message: string): Promise<void> {
   const bridge = getBridge();
-  await bridge.rebuildPageContainer({
+  await bridge.rebuildPageContainer(new RebuildPageContainer({
     containerTotalNum: 3,
     textObject: [
       makeHeader('Error'),
       makeContent(message),
       makeFooter('Tap: retry'),
     ],
-  });
+  }));
 }
 
 export async function updateListContent(state: AppState): Promise<void> {
@@ -142,19 +148,19 @@ export async function updateListContent(state: AppState): Promise<void> {
   const current = state.selectedIndex + 1;
   const listText = formatLandmarkList(state.landmarks, state.selectedIndex);
 
-  await bridge.textContainerUpgrade({
+  await bridge.textContainerUpgrade(new TextContainerUpgrade({
     containerID: 1,
     containerName: 'header',
     contentOffset: 0,
     contentLength: 1000,
     content: `Nearby Landmarks          ${current}/${total}`,
-  });
+  }));
 
-  await bridge.textContainerUpgrade({
+  await bridge.textContainerUpgrade(new TextContainerUpgrade({
     containerID: 2,
     containerName: 'content',
     contentOffset: 0,
     contentLength: 2000,
     content: listText,
-  });
+  }));
 }

@@ -1,6 +1,7 @@
+import { OsEventTypeList } from '@evenrealities/even_hub_sdk';
 import { getBridge } from './bridge';
 import { AppState } from './types';
-import { renderList, renderDetail, renderError, updateListContent } from './renderer';
+import { renderList, renderDetail, updateListContent } from './renderer';
 
 export function setupEventHandlers(
   state: AppState,
@@ -9,7 +10,8 @@ export function setupEventHandlers(
   const bridge = getBridge();
 
   bridge.onEvenHubEvent(async (event: any) => {
-    const eventType = event.osEventType ?? event.type;
+    // The SDK delivers osEventType as a numeric enum (OsEventTypeList)
+    const eventType = event.sysEvent?.eventType ?? event.osEventType ?? event.type;
 
     switch (state.mode) {
       case 'list':
@@ -19,7 +21,7 @@ export function setupEventHandlers(
         await handleDetailEvent(eventType, state);
         break;
       case 'error':
-        if (eventType === 'TAP_EVENT') {
+        if (eventType === OsEventTypeList.CLICK_EVENT) {
           onRefresh();
         }
         break;
@@ -27,44 +29,44 @@ export function setupEventHandlers(
   });
 }
 
-async function handleListEvent(eventType: string, state: AppState): Promise<void> {
+async function handleListEvent(eventType: number, state: AppState): Promise<void> {
   switch (eventType) {
-    case 'SCROLL_DOWN_EVENT':
+    case OsEventTypeList.SCROLL_BOTTOM_EVENT: // scroll down
       if (state.selectedIndex < state.landmarks.length - 1) {
         state.selectedIndex++;
         await updateListContent(state);
       }
       break;
 
-    case 'SCROLL_UP_EVENT':
+    case OsEventTypeList.SCROLL_TOP_EVENT: // scroll up
       if (state.selectedIndex > 0) {
         state.selectedIndex--;
         await updateListContent(state);
       }
       break;
 
-    case 'TAP_EVENT':
+    case OsEventTypeList.CLICK_EVENT: // tap
       state.mode = 'detail';
       await renderDetail(state.landmarks[state.selectedIndex]);
       break;
   }
 }
 
-async function handleDetailEvent(eventType: string, state: AppState): Promise<void> {
+async function handleDetailEvent(eventType: number, state: AppState): Promise<void> {
   switch (eventType) {
-    case 'TAP_EVENT':
+    case OsEventTypeList.CLICK_EVENT: // tap -> back to list
       state.mode = 'list';
       await renderList(state);
       break;
 
-    case 'SCROLL_DOWN_EVENT':
+    case OsEventTypeList.SCROLL_BOTTOM_EVENT: // next landmark
       if (state.selectedIndex < state.landmarks.length - 1) {
         state.selectedIndex++;
         await renderDetail(state.landmarks[state.selectedIndex]);
       }
       break;
 
-    case 'SCROLL_UP_EVENT':
+    case OsEventTypeList.SCROLL_TOP_EVENT: // previous landmark
       if (state.selectedIndex > 0) {
         state.selectedIndex--;
         await renderDetail(state.landmarks[state.selectedIndex]);
