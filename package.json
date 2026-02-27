@@ -1,0 +1,17 @@
+{
+  "name": "g2-landmarks",
+  "private": true,
+  "workspaces": ["packages/frontend", "packages/worker"],
+  "scripts": {
+    "dev:frontend": "npm run dev --workspace=packages/frontend",
+    "dev:worker": "npm run dev --workspace=packages/worker",
+    "dev": "concurrently \"npm run dev:worker\" \"npm run dev:frontend\"",
+    "deploy:frontend": "npm run deploy --workspace=packages/frontend",
+    "deploy:worker": "npm run deploy --workspace=packages/worker",
+    "deploy": "npm run deploy:worker && npm run deploy:frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0",
+    "typescript": "^5.5.0"
+  }
+}

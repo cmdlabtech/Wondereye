@@ -1,0 +1,15 @@
+{
+  "name": "g2-landmarks-worker",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "hono": "^4.0.0"
+  },
+  "devDependencies": {
+    "wrangler": "^3.91.0",
+    "@cloudflare/workers-types": "^4.0.0"
+  }
+}
