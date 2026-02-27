@@ -18,4 +18,4 @@ export const GEO_MAX_AGE = 60000;
 export const SEARCH_RADIUS = 500;
 
 // UI
-export const VISIBLE_LANDMARKS = 3;
+export const VISIBLE_LANDMARKS = 5;

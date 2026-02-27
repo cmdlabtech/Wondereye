@@ -10,21 +10,45 @@ export function setupEventHandlers(
   const bridge = getBridge();
 
   bridge.onEvenHubEvent(async (event: any) => {
-    // The SDK delivers osEventType as a numeric enum (OsEventTypeList)
-    const eventType = event.sysEvent?.eventType ?? event.osEventType ?? event.type;
+    let eventType: number | undefined =
+      event.textEvent?.eventType ??
+      event.listEvent?.eventType ??
+      event.sysEvent?.eventType;
 
-    switch (state.mode) {
-      case 'list':
-        await handleListEvent(eventType, state);
-        break;
-      case 'detail':
-        await handleDetailEvent(eventType, state);
-        break;
-      case 'error':
-        if (eventType === OsEventTypeList.CLICK_EVENT) {
+    // Simulator sends sysEvent:{} for click (no eventType field)
+    if (eventType == null && event.sysEvent) {
+      eventType = OsEventTypeList.CLICK_EVENT;
+    }
+
+    if (eventType == null) return;
+
+    try {
+      // Double-tap goes back in any view
+      if (eventType === OsEventTypeList.DOUBLE_CLICK_EVENT) {
+        if (state.mode === 'detail') {
+          state.mode = 'list';
+          await renderList(state);
+        } else {
           onRefresh();
         }
-        break;
+        return;
+      }
+
+      switch (state.mode) {
+        case 'list':
+          await handleListEvent(eventType, state);
+          break;
+        case 'detail':
+          await handleDetailEvent(eventType, state);
+          break;
+        case 'error':
+          if (eventType === OsEventTypeList.CLICK_EVENT) {
+            onRefresh();
+          }
+          break;
+      }
+    } catch (err) {
+      console.error('[events] handler error:', err);
     }
   });
 }

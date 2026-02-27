@@ -71,19 +71,13 @@ function truncate(text: string, maxLen: number): string {
 
 export function formatLandmarkList(landmarks: Landmark[], selectedIndex: number): string {
   const lines: string[] = [];
-  const start = Math.max(0, selectedIndex - 1);
+  const start = Math.max(0, selectedIndex - 2);
   const end = Math.min(landmarks.length, start + VISIBLE_LANDMARKS);
 
   for (let i = start; i < end; i++) {
     const lm = landmarks[i];
     const pointer = i === selectedIndex ? '\u25B6' : ' ';
-    const dist = formatDistance(lm.distance);
-
-    lines.push(`${pointer} ${lm.name}`);
-    lines.push(`  ${dist} \u2022 ${truncate(lm.snippet, 80)}`);
-    if (i < end - 1) {
-      lines.push('\u2500'.repeat(40));
-    }
+    lines.push(`${pointer} ${truncate(lm.name, 45)}`);
   }
 
   return lines.join('\n');
@@ -120,12 +114,14 @@ export async function renderDetail(landmark: Landmark): Promise<void> {
   const bridge = getBridge();
   const dist = formatDistance(landmark.distance);
 
+  const body = `${dist} away\n\n${landmark.snippet}`;
+
   await bridge.rebuildPageContainer(new RebuildPageContainer({
     containerTotalNum: 3,
     textObject: [
-      makeHeader(`${truncate(landmark.name, 35)}  ${dist}`),
-      makeContent(landmark.snippet),
-      makeFooter('Tap: back to list'),
+      makeHeader(truncate(landmark.name, 45)),
+      makeContent(body),
+      makeFooter('Tap: back  Scroll: prev/next'),
     ],
   }));
 }

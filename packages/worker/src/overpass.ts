@@ -52,7 +52,7 @@ export async function queryOverpass(
     pois.push({ name, type, lat: elLat, lng: elLng, distance: Math.round(distance) });
   }
 
-  return pois.sort((a, b) => a.distance - b.distance).slice(0, 10);
+  return pois.sort((a, b) => a.distance - b.distance).slice(0, 5);
 }
 
 function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
