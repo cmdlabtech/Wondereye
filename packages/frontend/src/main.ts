@@ -1,5 +1,5 @@
 import { initBridge } from './bridge';
-import { getCurrentPosition, checkLocationPermission, LocationError } from './geo';
+import { getCurrentPosition, LocationError } from './geo';
 import { fetchLandmarks } from './api';
 import { renderStartup, renderList, renderError } from './renderer';
 import { setupEventHandlers } from './events';
@@ -27,26 +27,13 @@ async function getLocation(): Promise<{ lat: number; lng: number }> {
     return { lat: paramLat, lng: paramLng };
   }
 
-  // Check permission state before requesting (avoids silent failures)
-  const permState = await checkLocationPermission();
-  if (permState === 'denied') {
-    console.warn('[geo] location permission denied at OS level');
-    throw {
-      code: 'denied',
-      message: 'Location permission denied.\nEnable in phone Settings > Even App > Location.',
-    } as LocationError;
-  }
-
   try {
     return await getCurrentPosition();
   } catch (e) {
     const locErr = e as LocationError;
-    if (locErr.code === 'denied' || locErr.code === 'unsupported') {
-      // Don't silently fallback for permission issues — surface to user
-      throw locErr;
-    }
-    // For timeout/unavailable, fall back to default location
-    console.warn('[geo] location failed, using fallback:', locErr.message);
+    // Fall back to Prague for all failures (denied, timeout, unavailable)
+    // On real glasses, the phone GPS handles location via the Even App
+    console.warn('[geo] location failed, using Prague fallback:', locErr.code, locErr.message);
     return { lat: FALLBACK_LAT, lng: FALLBACK_LNG };
   }
 }

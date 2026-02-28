@@ -1,7 +1,7 @@
 import { OsEventTypeList } from '@evenrealities/even_hub_sdk';
 import { getBridge } from './bridge';
 import { AppState } from './types';
-import { renderList, renderDetail, renderReadingPage, renderLoading, updateListContent, paginateText } from './renderer';
+import { renderList, renderDetail, renderReadingPage, renderLoading, stopLoading, updateListContent, paginateText } from './renderer';
 import { fetchLandmarkDetail } from './api';
 
 export function setupEventHandlers(
@@ -92,17 +92,28 @@ async function handleDetailEvent(eventType: number, state: AppState): Promise<vo
       break;
 
     case OsEventTypeList.SCROLL_BOTTOM_EVENT: {
-      // Scroll down loads extended details via Grok
       const landmark = state.landmarks[state.selectedIndex];
+
+      // Reuse cached detail if already fetched
+      if (state.readingPages && state.readingPages.length > 0) {
+        state.readingPage = 0;
+        state.mode = 'reading';
+        await renderReadingPage(landmark, state.readingPages[0], 0, state.readingPages.length);
+        break;
+      }
+
+      // Fetch extended details via Grok
       await renderLoading();
       try {
         const detail = await fetchLandmarkDetail(landmark.name);
+        stopLoading();
         state.detailText = detail;
         state.readingPages = paginateText(detail);
         state.readingPage = 0;
         state.mode = 'reading';
         await renderReadingPage(landmark, state.readingPages[0], 0, state.readingPages.length);
       } catch {
+        stopLoading();
         state.mode = 'reading';
         state.detailText = '';
         state.readingPages = ['No additional details available.'];
@@ -113,11 +124,7 @@ async function handleDetailEvent(eventType: number, state: AppState): Promise<vo
     }
 
     case OsEventTypeList.SCROLL_TOP_EVENT:
-      // Scroll up navigates to previous landmark
-      if (state.selectedIndex > 0) {
-        state.selectedIndex--;
-        await renderDetail(state.landmarks[state.selectedIndex]);
-      }
+      // No action — double-tap to go back to list
       break;
   }
 }
@@ -151,10 +158,7 @@ async function handleReadingEvent(eventType: number, state: AppState): Promise<v
         state.readingPage = page - 1;
         await renderReadingPage(landmark, pages[page - 1], page - 1, pages.length);
       } else {
-        // At first page, scroll up goes back to snippet
-        state.detailText = undefined;
-        state.readingPage = undefined;
-        state.readingPages = undefined;
+        // At first page, scroll up goes back to snippet (keep cached detail)
         state.mode = 'detail';
         await renderDetail(landmark);
       }

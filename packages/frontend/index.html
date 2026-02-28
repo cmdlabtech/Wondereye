@@ -5,12 +5,59 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Wondereye</title>
   <style>
-    body { font-family: system-ui, sans-serif; padding: 2rem; background: #111; color: #0f0; }
-    #status { font-size: 1.2rem; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #111;
+      color: #e0e0e0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+    .container {
+      max-width: 520px;
+      text-align: center;
+    }
+    h1 {
+      font-size: 3rem;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.75rem;
+    }
+    .tagline {
+      font-size: 1.25rem;
+      color: #aaa;
+      line-height: 1.5;
+      margin-bottom: 2rem;
+    }
+    .description {
+      font-size: 1rem;
+      color: #777;
+      line-height: 1.7;
+      margin-bottom: 2.5rem;
+    }
+    .badge {
+      display: inline-block;
+      padding: 0.4rem 1rem;
+      border: 1px solid #333;
+      border-radius: 2rem;
+      font-size: 0.85rem;
+      color: #888;
+    }
   </style>
 </head>
 <body>
-  <div id="status">Loading...</div>
-  <script type="module" src="/src/main.ts"></script>
+  <div class="container">
+    <h1>Wondereye</h1>
+    <p class="tagline">Look out, not down.<br>Discover landmarks through your glasses.</p>
+    <p class="description">
+      Wondereye identifies nearby landmarks and delivers instant background powered by Grok &mdash; all on your Even G2 smart glasses.
+    </p>
+    <span class="badge">Built for Even G2</span>
+  </div>
 </body>
 </html>

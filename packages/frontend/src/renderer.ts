@@ -81,7 +81,14 @@ function makeFooter(text: string): TextContainerProperty {
 }
 
 function formatDistance(meters: number): string {
-  return meters < 1000 ? `${meters}m` : `${(meters / 1000).toFixed(1)}km`;
+  const miles = meters / 1609.344;
+  return miles < 0.1 ? `${Math.round(meters * 3.281)}ft` : `${miles.toFixed(1)}mi`;
+}
+
+function makeDetailHeader(name: string, distance: number): TextContainerProperty {
+  const dist = formatDistance(distance);
+  const maxName = 45 - dist.length - 2;
+  return makeHeader(`${truncate(name, maxName)}  ${dist}`);
 }
 
 function truncate(text: string, maxLen: number): string {
@@ -117,14 +124,12 @@ export async function renderStartup(): Promise<void> {
 
 export async function renderList(state: AppState): Promise<void> {
   const bridge = getBridge();
-  const total = state.landmarks.length;
-  const current = state.selectedIndex + 1;
   const footerText = state.city || 'Scroll: browse  Tap: details';
 
   await bridge.rebuildPageContainer(new RebuildPageContainer({
     containerTotalNum: 4,
     textObject: [
-      makeHeader(`Nearby Landmarks          ${current}/${total}`),
+      makeHeader('Nearby Landmarks'),
       makeContent(formatLandmarkList(state.landmarks, state.selectedIndex)),
       makeFooter(footerText),
       makeEventCapture(),
@@ -134,15 +139,12 @@ export async function renderList(state: AppState): Promise<void> {
 
 export async function renderDetail(landmark: Landmark): Promise<void> {
   const bridge = getBridge();
-  const dist = formatDistance(landmark.distance);
-
-  const body = `${dist} away\n\n${landmark.snippet}`;
 
   await bridge.rebuildPageContainer(new RebuildPageContainer({
     containerTotalNum: 4,
     textObject: [
-      makeHeader(truncate(landmark.name, 45)),
-      makeContent(body),
+      makeDetailHeader(landmark.name, landmark.distance),
+      makeContent(landmark.snippet),
       makeFooter('\u2193 Read more  Tap: back'),
       makeEventCapture(),
     ],
@@ -170,16 +172,16 @@ export function paginateText(text: string): string[] {
   return pages;
 }
 
-export async function renderReadingPage(landmark: Landmark, page: string, pageNum: number, totalPages: number): Promise<void> {
+export async function renderReadingPage(landmark: Landmark, page: string, _pageNum: number, totalPages: number): Promise<void> {
   const bridge = getBridge();
   const footer = totalPages > 1
-    ? `Page ${pageNum + 1}/${totalPages}  \u2191\u2193 Scroll  Tap: back`
+    ? `\u2191\u2193 Scroll  Tap: back`
     : 'Tap: back';
 
   await bridge.rebuildPageContainer(new RebuildPageContainer({
     containerTotalNum: 4,
     textObject: [
-      makeHeader(truncate(landmark.name, 45)),
+      makeDetailHeader(landmark.name, landmark.distance),
       makeContent(page),
       makeFooter(footer),
       makeEventCapture(),
@@ -187,15 +189,33 @@ export async function renderReadingPage(landmark: Landmark, page: string, pageNu
   }));
 }
 
+let loadingTimer: ReturnType<typeof setInterval> | null = null;
+
 export async function renderLoading(): Promise<void> {
   const bridge = getBridge();
-  await bridge.textContainerUpgrade(new TextContainerUpgrade({
-    containerID: 2,
-    containerName: 'content',
-    contentOffset: 0,
-    contentLength: 'Loading details...'.length,
-    content: 'Loading details...',
-  }));
+  let dots = 0;
+
+  const update = async () => {
+    dots = (dots + 1) % 4;
+    const text = 'Gathering details' + '.'.repeat(dots).padEnd(3, ' ');
+    await bridge.textContainerUpgrade(new TextContainerUpgrade({
+      containerID: 2,
+      containerName: 'content',
+      contentOffset: 0,
+      contentLength: text.length,
+      content: text,
+    }));
+  };
+
+  await update();
+  loadingTimer = setInterval(update, 400);
+}
+
+export function stopLoading(): void {
+  if (loadingTimer !== null) {
+    clearInterval(loadingTimer);
+    loadingTimer = null;
+  }
 }
 
 export async function renderError(message: string): Promise<void> {
