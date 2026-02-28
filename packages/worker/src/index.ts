@@ -83,14 +83,10 @@ app.post('/api/landmarks', async (c) => {
   const safeLng = Math.round(lng * 1000) / 1000;
 
   const key = cacheKey(safeLat, safeLng, radius);
-  const isDev = c.req.header('origin')?.includes('localhost');
 
-  // Check cache (skip in local dev to always get fresh results)
-  if (!isDev) {
-    const cached = await c.env.LANDMARKS_CACHE.get(key, 'json');
-    if (cached) {
-      return c.json(cached as LandmarkResponse);
-    }
+  const cached = await c.env.LANDMARKS_CACHE.get(key, 'json');
+  if (cached) {
+    return c.json(cached as LandmarkResponse);
   }
 
   try {
@@ -98,23 +94,19 @@ app.post('/api/landmarks', async (c) => {
 
     if (pois.length === 0) {
       const emptyResponse: LandmarkResponse = { landmarks: [] };
-      if (!isDev) {
-        await c.env.LANDMARKS_CACHE.put(key, JSON.stringify(emptyResponse), {
-          expirationTtl: CACHE_TTL,
-        });
-      }
+      await c.env.LANDMARKS_CACHE.put(key, JSON.stringify(emptyResponse), {
+        expirationTtl: CACHE_TTL,
+      });
       return c.json(emptyResponse);
     }
 
     const landmarks = await generateSnippets(pois, c.env.XAI_API_KEY);
     const response: LandmarkResponse = { landmarks };
-    if (!isDev) {
-      c.executionCtx.waitUntil(
-        c.env.LANDMARKS_CACHE.put(key, JSON.stringify(response), {
-          expirationTtl: CACHE_TTL,
-        })
-      );
-    }
+    c.executionCtx.waitUntil(
+      c.env.LANDMARKS_CACHE.put(key, JSON.stringify(response), {
+        expirationTtl: CACHE_TTL,
+      })
+    );
     return c.json(response);
   } catch (err) {
     console.error('[api] landmarks error:', err);
