@@ -24,8 +24,7 @@ export interface LandmarkResponse {
 }
 
 export type Bindings = {
-  ANTHROPIC_API_KEY: string;
-  XAI_API_KEY?: string;
+  XAI_API_KEY: string;
   ALLOWED_ORIGIN?: string;
   LANDMARKS_CACHE: KVNamespace;
 };

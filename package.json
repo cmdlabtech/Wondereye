@@ -1,7 +1,10 @@
 {
   "name": "wondereye",
   "private": true,
-  "workspaces": ["packages/frontend", "packages/worker"],
+  "workspaces": [
+    "packages/frontend",
+    "packages/worker"
+  ],
   "scripts": {
     "dev:frontend": "npm run dev --workspace=packages/frontend",
     "dev:worker": "npm run dev --workspace=packages/worker",
@@ -12,6 +15,7 @@
   },
   "devDependencies": {
     "concurrently": "^9.0.0",
-    "typescript": "^5.5.0"
+    "typescript": "^5.5.0",
+    "wrangler": "^4.69.0"
   }
 }

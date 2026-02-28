@@ -8,21 +8,22 @@ export async function generateSnippets(
   const sanitize = (s: string) => s.replace(/[^\p{L}\p{N}\s\-'.,&()]/gu, '').slice(0, 100);
   const nameList = pois.map((p) => `- ${sanitize(p.name)} (${sanitize(p.type)})`).join('\n');
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+  const response = await fetch('https://api.x.ai/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
+      'Authorization': `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 2048,
+      model: 'grok-4-1-fast-non-reasoning',
       messages: [
         {
+          role: 'system',
+          content: 'You are a concise tour guide for smart glasses with a tiny display. Use Grokipedia to provide accurate, factual information. Return ONLY valid JSON with no other text.',
+        },
+        {
           role: 'user',
-          content: `You are a concise tour guide for smart glasses with a tiny display.
-From the list below, pick up to 5 of the most interesting places a visitor would want to see. Rank by notability — prioritize famous landmarks, popular museums, and historic sites, but include local gems if fewer than 5 major landmarks are available.
+          content: `From the list below, pick up to 5 of the most interesting places a visitor would want to see. Rank by notability — prioritize famous landmarks, popular museums, and historic sites, but include local gems if fewer than 5 major landmarks are available.
 For each chosen place, write a brief background (max 280 characters). Start with what it is and why it matters, then add the single most interesting historical or cultural fact.
 No markdown, no bullet points.
 Return ONLY a JSON array of objects with "name" and "snippet" fields. The "name" must exactly match the candidate name.
@@ -35,11 +36,11 @@ ${nameList}`,
   });
 
   if (!response.ok) {
-    throw new Error(`Claude API error: ${response.status}`);
+    throw new Error(`Grok API error: ${response.status}`);
   }
 
   const result: any = await response.json();
-  const text = result.content[0].text;
+  const text = result.choices?.[0]?.message?.content || '';
 
   let snippets: Array<{ name: string; snippet: string }>;
   try {

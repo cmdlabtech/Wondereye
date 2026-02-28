@@ -106,7 +106,7 @@ app.post('/api/landmarks', async (c) => {
       return c.json(emptyResponse);
     }
 
-    const landmarks = await generateSnippets(pois, c.env.ANTHROPIC_API_KEY);
+    const landmarks = await generateSnippets(pois, c.env.XAI_API_KEY);
     const response: LandmarkResponse = { landmarks };
     if (!isDev) {
       c.executionCtx.waitUntil(
@@ -138,10 +138,6 @@ app.post('/api/landmark-detail', async (c) => {
   const { name } = body;
   if (typeof name !== 'string' || name.length === 0 || name.length > 200) {
     return c.json({ error: 'name is required (string, max 200 chars)' }, 400);
-  }
-
-  if (!c.env.XAI_API_KEY) {
-    return c.json({ detail: '' });
   }
 
   try {
