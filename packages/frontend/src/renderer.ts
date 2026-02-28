@@ -27,6 +27,25 @@ function makeHeader(text: string): TextContainerProperty {
   });
 }
 
+// Invisible container solely for capturing input events (G2 guide pattern).
+// Prevents native text scroll on visible containers.
+function makeEventCapture(): TextContainerProperty {
+  return new TextContainerProperty({
+    containerID: 4,
+    containerName: 'capture',
+    xPosition: 0,
+    yPosition: 0,
+    width: DISPLAY_WIDTH,
+    height: DISPLAY_HEIGHT,
+    borderWidth: 0,
+    borderColor: 0,
+    borderRdaius: 0,
+    paddingLength: 0,
+    content: '',
+    isEventCapture: 1,
+  });
+}
+
 function makeContent(text: string): TextContainerProperty {
   return new TextContainerProperty({
     containerID: 2,
@@ -40,7 +59,7 @@ function makeContent(text: string): TextContainerProperty {
     borderRdaius: 0,
     paddingLength: 4,
     content: text,
-    isEventCapture: 1,
+    isEventCapture: 0,
   });
 }
 
@@ -86,11 +105,12 @@ export function formatLandmarkList(landmarks: Landmark[], selectedIndex: number)
 export async function renderStartup(): Promise<void> {
   const bridge = getBridge();
   await bridge.createStartUpPageContainer(new CreateStartUpPageContainer({
-    containerTotalNum: 3,
+    containerTotalNum: 4,
     textObject: [
-      makeHeader('Landmark Explorer'),
+      makeHeader('Wondereye'),
       makeContent('Getting your location...'),
       makeFooter('Please wait'),
+      makeEventCapture(),
     ],
   }));
 }
@@ -102,11 +122,12 @@ export async function renderList(state: AppState): Promise<void> {
   const footerText = state.city || 'Scroll: browse  Tap: details';
 
   await bridge.rebuildPageContainer(new RebuildPageContainer({
-    containerTotalNum: 3,
+    containerTotalNum: 4,
     textObject: [
       makeHeader(`Nearby Landmarks          ${current}/${total}`),
       makeContent(formatLandmarkList(state.landmarks, state.selectedIndex)),
       makeFooter(footerText),
+      makeEventCapture(),
     ],
   }));
 }
@@ -118,55 +139,88 @@ export async function renderDetail(landmark: Landmark): Promise<void> {
   const body = `${dist} away\n\n${landmark.snippet}`;
 
   await bridge.rebuildPageContainer(new RebuildPageContainer({
-    containerTotalNum: 3,
+    containerTotalNum: 4,
     textObject: [
       makeHeader(truncate(landmark.name, 45)),
       makeContent(body),
-      makeFooter('Tap: back  Scroll: prev/next'),
+      makeFooter('\u2193 Read more  Tap: back'),
+      makeEventCapture(),
     ],
+  }));
+}
+
+// ~10 lines visible in 218px content area, ~55 chars per line
+const CHARS_PER_PAGE = 500;
+
+export function paginateText(text: string): string[] {
+  if (!text) return ['No additional details available.'];
+  const pages: string[] = [];
+  let remaining = text;
+  while (remaining.length > 0) {
+    if (remaining.length <= CHARS_PER_PAGE) {
+      pages.push(remaining);
+      break;
+    }
+    // Break at last space before the limit
+    let cut = remaining.lastIndexOf(' ', CHARS_PER_PAGE);
+    if (cut <= 0) cut = CHARS_PER_PAGE;
+    pages.push(remaining.slice(0, cut));
+    remaining = remaining.slice(cut).trimStart();
+  }
+  return pages;
+}
+
+export async function renderReadingPage(landmark: Landmark, page: string, pageNum: number, totalPages: number): Promise<void> {
+  const bridge = getBridge();
+  const footer = totalPages > 1
+    ? `Page ${pageNum + 1}/${totalPages}  \u2191\u2193 Scroll  Tap: back`
+    : 'Tap: back';
+
+  await bridge.rebuildPageContainer(new RebuildPageContainer({
+    containerTotalNum: 4,
+    textObject: [
+      makeHeader(truncate(landmark.name, 45)),
+      makeContent(page),
+      makeFooter(footer),
+      makeEventCapture(),
+    ],
+  }));
+}
+
+export async function renderLoading(): Promise<void> {
+  const bridge = getBridge();
+  await bridge.textContainerUpgrade(new TextContainerUpgrade({
+    containerID: 2,
+    containerName: 'content',
+    contentOffset: 0,
+    contentLength: 'Loading details...'.length,
+    content: 'Loading details...',
   }));
 }
 
 export async function renderError(message: string): Promise<void> {
   const bridge = getBridge();
   await bridge.rebuildPageContainer(new RebuildPageContainer({
-    containerTotalNum: 3,
+    containerTotalNum: 4,
     textObject: [
       makeHeader('Error'),
       makeContent(message),
       makeFooter('Tap: retry'),
+      makeEventCapture(),
     ],
   }));
 }
 
 export async function updateListContent(state: AppState): Promise<void> {
   const bridge = getBridge();
-  const total = state.landmarks.length;
-  const current = state.selectedIndex + 1;
   const listText = formatLandmarkList(state.landmarks, state.selectedIndex);
-  const footerText = state.city || 'Scroll: browse  Tap: details';
 
-  await bridge.textContainerUpgrade(new TextContainerUpgrade({
-    containerID: 1,
-    containerName: 'header',
-    contentOffset: 0,
-    contentLength: 1000,
-    content: `Nearby Landmarks          ${current}/${total}`,
-  }));
-
+  // Only update the content container on scroll to avoid multi-container redraw flicker
   await bridge.textContainerUpgrade(new TextContainerUpgrade({
     containerID: 2,
     containerName: 'content',
     contentOffset: 0,
-    contentLength: 2000,
+    contentLength: listText.length,
     content: listText,
-  }));
-
-  await bridge.textContainerUpgrade(new TextContainerUpgrade({
-    containerID: 3,
-    containerName: 'footer',
-    contentOffset: 0,
-    contentLength: 1000,
-    content: footerText,
   }));
 }

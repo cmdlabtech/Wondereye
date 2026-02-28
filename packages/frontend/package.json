@@ -1,5 +1,5 @@
 {
-  "name": "g2-landmarks-frontend",
+  "name": "wondereye-frontend",
   "private": true,
   "scripts": {
     "dev": "vite",

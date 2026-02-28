@@ -1,9 +1,9 @@
 {
-  "name": "g2-landmarks-api",
+  "name": "wondereye-api",
   "main": "src/index.ts",
   "compatibility_date": "2025-04-01",
   "routes": [
-    { "pattern": "landmark-api.cmdlab.tech", "custom_domain": true }
+    { "pattern": "api.wondereye.app", "custom_domain": true }
   ],
   "kv_namespaces": [
     {

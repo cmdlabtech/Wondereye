@@ -10,7 +10,7 @@ export const LIST_HEIGHT = DISPLAY_HEIGHT - HEADER_HEIGHT - FOOTER_HEIGHT; // 21
 // API
 export const API_BASE_URL = import.meta.env.DEV
   ? 'http://localhost:8787'
-  : 'https://landmark-api.cmdlab.tech';
+  : 'https://api.wondereye.app';
 
 // Geolocation
 export const GEO_TIMEOUT = 10000;

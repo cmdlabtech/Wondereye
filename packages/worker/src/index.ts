@@ -83,11 +83,14 @@ app.post('/api/landmarks', async (c) => {
   const safeLng = Math.round(lng * 1000) / 1000;
 
   const key = cacheKey(safeLat, safeLng, radius);
+  const isDev = c.req.header('origin')?.includes('localhost');
 
-  // Check cache first
-  const cached = await c.env.LANDMARKS_CACHE.get(key, 'json');
-  if (cached) {
-    return c.json(cached as LandmarkResponse);
+  // Check cache (skip in local dev to always get fresh results)
+  if (!isDev) {
+    const cached = await c.env.LANDMARKS_CACHE.get(key, 'json');
+    if (cached) {
+      return c.json(cached as LandmarkResponse);
+    }
   }
 
   try {
@@ -95,23 +98,85 @@ app.post('/api/landmarks', async (c) => {
 
     if (pois.length === 0) {
       const emptyResponse: LandmarkResponse = { landmarks: [] };
-      await c.env.LANDMARKS_CACHE.put(key, JSON.stringify(emptyResponse), {
-        expirationTtl: CACHE_TTL,
-      });
+      if (!isDev) {
+        await c.env.LANDMARKS_CACHE.put(key, JSON.stringify(emptyResponse), {
+          expirationTtl: CACHE_TTL,
+        });
+      }
       return c.json(emptyResponse);
     }
 
     const landmarks = await generateSnippets(pois, c.env.ANTHROPIC_API_KEY);
     const response: LandmarkResponse = { landmarks };
-    c.executionCtx.waitUntil(
-      c.env.LANDMARKS_CACHE.put(key, JSON.stringify(response), {
-        expirationTtl: CACHE_TTL,
-      })
-    );
+    if (!isDev) {
+      c.executionCtx.waitUntil(
+        c.env.LANDMARKS_CACHE.put(key, JSON.stringify(response), {
+          expirationTtl: CACHE_TTL,
+        })
+      );
+    }
     return c.json(response);
   } catch (err) {
     console.error('[api] landmarks error:', err);
     return c.json({ error: 'Failed to fetch landmarks. Please try again.' }, 502);
+  }
+});
+
+app.post('/api/landmark-detail', async (c) => {
+  const ip = c.req.header('cf-connecting-ip') || 'unknown';
+  if (!checkRateLimit(ip)) {
+    return c.json({ error: 'Too many requests. Try again shortly.' }, 429);
+  }
+
+  let body: any;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: 'Invalid JSON body' }, 400);
+  }
+
+  const { name } = body;
+  if (typeof name !== 'string' || name.length === 0 || name.length > 200) {
+    return c.json({ error: 'name is required (string, max 200 chars)' }, 400);
+  }
+
+  if (!c.env.XAI_API_KEY) {
+    return c.json({ detail: '' });
+  }
+
+  try {
+    const res = await fetch('https://api.x.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${c.env.XAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'grok-4-1-fast-non-reasoning',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a knowledgeable tour guide. Use Grokipedia to provide accurate, factual information. Write in plain text with no markdown, no bullet points, no special formatting.',
+          },
+          {
+            role: 'user',
+            content: `Give a concise background on the landmark "${name}". Include what it is, its history, why it's notable, and one interesting fact. Keep it under 800 characters.`,
+          },
+        ],
+      }),
+    });
+
+    if (!res.ok) {
+      console.error('[api] Grok API error:', res.status);
+      return c.json({ detail: '' });
+    }
+
+    const data: any = await res.json();
+    const text = data.choices?.[0]?.message?.content || '';
+    return c.json({ detail: text });
+  } catch (err) {
+    console.error('[api] landmark-detail error:', err);
+    return c.json({ detail: '' });
   }
 });
 

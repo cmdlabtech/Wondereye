@@ -1,5 +1,5 @@
 {
-  "name": "g2-landmarks-worker",
+  "name": "wondereye-worker",
   "private": true,
   "scripts": {
     "dev": "wrangler dev",

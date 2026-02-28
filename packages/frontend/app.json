@@ -1,0 +1,8 @@
+{
+  "package_id": "app.wondereye",
+  "version": "1.0.0",
+  "name": "Wondereye",
+  "description": "Look out, not down. Discover landmarks through your glasses.",
+  "permissions": ["location"],
+  "entry": "index.html"
+}

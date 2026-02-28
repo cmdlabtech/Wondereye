@@ -1,5 +1,5 @@
 import { initBridge } from './bridge';
-import { getCurrentPosition } from './geo';
+import { getCurrentPosition, checkLocationPermission, LocationError } from './geo';
 import { fetchLandmarks } from './api';
 import { renderStartup, renderList, renderError } from './renderer';
 import { setupEventHandlers } from './events';
@@ -12,9 +12,9 @@ const state: AppState = {
   mode: 'loading',
 };
 
-// Fallback coordinates (Washington DC) for simulator/testing
-const FALLBACK_LAT = 38.8977;
-const FALLBACK_LNG = -77.0365;
+// Fallback coordinates (Prague, Czech Republic) for simulator/testing
+const FALLBACK_LAT = 50.090167;
+const FALLBACK_LNG = 14.401917;
 
 async function getLocation(): Promise<{ lat: number; lng: number }> {
   // Allow overriding location via URL params (for simulator)
@@ -27,10 +27,26 @@ async function getLocation(): Promise<{ lat: number; lng: number }> {
     return { lat: paramLat, lng: paramLng };
   }
 
+  // Check permission state before requesting (avoids silent failures)
+  const permState = await checkLocationPermission();
+  if (permState === 'denied') {
+    console.warn('[geo] location permission denied at OS level');
+    throw {
+      code: 'denied',
+      message: 'Location permission denied.\nEnable in phone Settings > Even App > Location.',
+    } as LocationError;
+  }
+
   try {
     return await getCurrentPosition();
   } catch (e) {
-    console.warn('Geolocation failed, using fallback location:', e);
+    const locErr = e as LocationError;
+    if (locErr.code === 'denied' || locErr.code === 'unsupported') {
+      // Don't silently fallback for permission issues — surface to user
+      throw locErr;
+    }
+    // For timeout/unavailable, fall back to default location
+    console.warn('[geo] location failed, using fallback:', locErr.message);
     return { lat: FALLBACK_LAT, lng: FALLBACK_LNG };
   }
 }
@@ -67,7 +83,17 @@ async function loadLandmarks(): Promise<void> {
   } catch (error) {
     console.error('[app] loadLandmarks error:', error);
     state.mode = 'error';
-    state.errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    // Show specific messages for location permission errors
+    const locErr = error as LocationError;
+    if (locErr.code === 'denied') {
+      state.errorMessage = locErr.message;
+    } else if (locErr.code === 'unsupported') {
+      state.errorMessage = locErr.message;
+    } else {
+      state.errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    }
+
     try {
       await renderError(state.errorMessage);
     } catch (renderErr) {

@@ -1,8 +1,8 @@
 {
-  "name": "g2-landmarks-app",
+  "name": "wondereye-app",
   "compatibility_date": "2025-04-01",
   "routes": [
-    { "pattern": "landmark.cmdlab.tech", "custom_domain": true }
+    { "pattern": "wondereye.app", "custom_domain": true }
   ],
   "assets": {
     "directory": "./dist"

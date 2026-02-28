@@ -1,5 +1,5 @@
 {
-  "name": "g2-landmarks",
+  "name": "wondereye",
   "private": true,
   "workspaces": ["packages/frontend", "packages/worker"],
   "scripts": {
