@@ -15,7 +15,7 @@ export const API_BASE_URL = import.meta.env.DEV
 // Geolocation
 export const GEO_TIMEOUT = 10000;
 export const GEO_MAX_AGE = 60000;
-export const SEARCH_RADIUS = 500;
+export const SEARCH_RADIUS = 2000;
 
 // UI
 export const VISIBLE_LANDMARKS = 5;

@@ -22,11 +22,12 @@ export async function generateSnippets(
         {
           role: 'user',
           content: `You are a concise tour guide for smart glasses with a tiny display.
-For each landmark below, write a 1-2 sentence snippet (max 120 characters).
+From the list below, pick up to 5 of the most interesting places a visitor would want to see. Rank by notability — prioritize famous landmarks, popular museums, and historic sites, but include local gems if fewer than 5 major landmarks are available.
+For each chosen place, write a 1-2 sentence snippet (max 120 characters).
 Focus on the single most interesting fact. No markdown, no bullet points.
-Return ONLY a JSON array of objects with "name" and "snippet" fields.
+Return ONLY a JSON array of objects with "name" and "snippet" fields. The "name" must exactly match the candidate name.
 
-Landmarks:
+Candidates:
 ${nameList}`,
         },
       ],
@@ -42,21 +43,30 @@ ${nameList}`,
 
   let snippets: Array<{ name: string; snippet: string }>;
   try {
-    snippets = JSON.parse(text);
+    const parsed = JSON.parse(text);
+    snippets = Array.isArray(parsed) ? parsed : [];
   } catch {
     const match = text.match(/\[[\s\S]*\]/);
     snippets = match ? JSON.parse(match[0]) : [];
   }
+  // Validate each snippet has required string fields
+  snippets = snippets.filter(
+    (s) => s && typeof s.name === 'string' && typeof s.snippet === 'string'
+  );
 
-  return pois.map((poi) => {
-    const found = snippets.find(
-      (s) => s.name.toLowerCase() === poi.name.toLowerCase()
-    );
-    return {
-      name: poi.name,
-      type: poi.type,
-      distance: poi.distance,
-      snippet: found?.snippet ?? `A notable ${poi.type} nearby.`,
-    };
-  });
+  return snippets
+    .map((s) => {
+      const poi = pois.find(
+        (p) => p.name.toLowerCase() === s.name.toLowerCase()
+      );
+      if (!poi) return null;
+      return {
+        name: poi.name,
+        type: poi.type,
+        distance: poi.distance,
+        snippet: s.snippet,
+      };
+    })
+    .filter((l): l is Landmark => l !== null)
+    .slice(0, 5);
 }

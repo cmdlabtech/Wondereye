@@ -4,5 +4,12 @@
   "compatibility_date": "2025-04-01",
   "routes": [
     { "pattern": "landmark-api.cmdlab.tech", "custom_domain": true }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "LANDMARKS_CACHE",
+      "id": "PLACEHOLDER_REPLACE_BEFORE_DEPLOY",
+      "preview_id": "local-dev-cache"
+    }
   ]
 }

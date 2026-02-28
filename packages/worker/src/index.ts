@@ -2,10 +2,15 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { queryOverpass } from './overpass';
 import { generateSnippets } from './claude';
-import { Bindings } from './types';
+import { Bindings, LandmarkResponse } from './types';
 
 const MAX_RADIUS = 2000;
 const MIN_RADIUS = 50;
+const CACHE_TTL = 86400; // 24 hours in seconds
+
+function cacheKey(lat: number, lng: number, radius: number): string {
+  return `landmarks:${lat.toFixed(3)}:${lng.toFixed(3)}:${radius}`;
+}
 const RATE_LIMIT_WINDOW = 60_000; // 1 minute
 const RATE_LIMIT_MAX = 10; // requests per window per IP
 
@@ -26,11 +31,22 @@ function checkRateLimit(ip: string): boolean {
 const app = new Hono<{ Bindings: Bindings }>();
 
 app.use('/*', async (c, next) => {
-  const origin = c.env.ALLOWED_ORIGIN;
-  if (!origin) {
+  await next();
+  c.res.headers.set('X-Content-Type-Options', 'nosniff');
+  c.res.headers.set('X-Frame-Options', 'DENY');
+  c.res.headers.set('Referrer-Policy', 'no-referrer');
+  c.res.headers.set('Permissions-Policy', 'geolocation=(), camera=(), microphone=()');
+});
+
+app.use('/*', async (c, next) => {
+  const allowed = c.env.ALLOWED_ORIGIN;
+  if (!allowed) {
     return c.json({ error: 'Service misconfigured' }, 500);
   }
-  const middleware = cors({ origin });
+  const origins = allowed.split(',').map((o) => o.trim());
+  const middleware = cors({
+    origin: (reqOrigin) => origins.includes(reqOrigin) ? reqOrigin : '',
+  });
   return middleware(c, next);
 });
 
@@ -66,15 +82,33 @@ app.post('/api/landmarks', async (c) => {
   const safeLat = Math.round(lat * 1000) / 1000;
   const safeLng = Math.round(lng * 1000) / 1000;
 
+  const key = cacheKey(safeLat, safeLng, radius);
+
+  // Check cache first
+  const cached = await c.env.LANDMARKS_CACHE.get(key, 'json');
+  if (cached) {
+    return c.json(cached as LandmarkResponse);
+  }
+
   try {
     const pois = await queryOverpass(safeLat, safeLng, radius);
 
     if (pois.length === 0) {
-      return c.json({ landmarks: [] });
+      const emptyResponse: LandmarkResponse = { landmarks: [] };
+      await c.env.LANDMARKS_CACHE.put(key, JSON.stringify(emptyResponse), {
+        expirationTtl: CACHE_TTL,
+      });
+      return c.json(emptyResponse);
     }
 
     const landmarks = await generateSnippets(pois, c.env.ANTHROPIC_API_KEY);
-    return c.json({ landmarks });
+    const response: LandmarkResponse = { landmarks };
+    c.executionCtx.waitUntil(
+      c.env.LANDMARKS_CACHE.put(key, JSON.stringify(response), {
+        expirationTtl: CACHE_TTL,
+      })
+    );
+    return c.json(response);
   } catch (err) {
     console.error('[api] landmarks error:', err);
     return c.json({ error: 'Failed to fetch landmarks. Please try again.' }, 502);

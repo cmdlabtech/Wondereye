@@ -10,4 +10,5 @@ export interface AppState {
   selectedIndex: number;
   mode: 'loading' | 'list' | 'detail' | 'error';
   errorMessage?: string;
+  city?: string;
 }

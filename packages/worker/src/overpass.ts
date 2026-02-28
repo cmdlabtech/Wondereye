@@ -6,12 +6,12 @@ export async function queryOverpass(
   radius: number
 ): Promise<RawPOI[]> {
   const query = `
-    [out:json][timeout:10];
+    [out:json][timeout:25];
     (
-      nwr["tourism"~"museum|attraction|viewpoint|artwork|gallery"](around:${radius},${lat},${lng});
-      nwr["historic"~"monument|memorial|castle|archaeological_site|building"](around:${radius},${lat},${lng});
-      nwr["amenity"~"place_of_worship|theatre|library"](around:${radius},${lat},${lng});
-      nwr["building"~"cathedral|church|mosque|synagogue|temple"](around:${radius},${lat},${lng});
+      nwr["name"]["tourism"~"museum|attraction|viewpoint|artwork|gallery"](around:${radius},${lat},${lng});
+      nwr["name"]["historic"~"monument|memorial|castle|archaeological_site|building"](around:${radius},${lat},${lng});
+      nwr["name"]["amenity"~"place_of_worship|theatre|library"](around:${radius},${lat},${lng});
+      nwr["name"]["building"~"cathedral|church|mosque|synagogue|temple"](around:${radius},${lat},${lng});
     );
     out center body qt;
   `;
@@ -27,6 +27,10 @@ export async function queryOverpass(
   }
 
   const data: any = await response.json();
+
+  if (!data || !Array.isArray(data.elements)) {
+    throw new Error('Unexpected Overpass response format');
+  }
 
   const seen = new Set<string>();
   const pois: RawPOI[] = [];
@@ -52,7 +56,7 @@ export async function queryOverpass(
     pois.push({ name, type, lat: elLat, lng: elLng, distance: Math.round(distance) });
   }
 
-  return pois.sort((a, b) => a.distance - b.distance).slice(0, 5);
+  return pois.sort((a, b) => a.distance - b.distance).slice(0, 20);
 }
 
 function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {

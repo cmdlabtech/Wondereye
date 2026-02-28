@@ -99,13 +99,14 @@ export async function renderList(state: AppState): Promise<void> {
   const bridge = getBridge();
   const total = state.landmarks.length;
   const current = state.selectedIndex + 1;
+  const footerText = state.city || 'Scroll: browse  Tap: details';
 
   await bridge.rebuildPageContainer(new RebuildPageContainer({
     containerTotalNum: 3,
     textObject: [
       makeHeader(`Nearby Landmarks          ${current}/${total}`),
       makeContent(formatLandmarkList(state.landmarks, state.selectedIndex)),
-      makeFooter('Scroll: browse  Tap: details'),
+      makeFooter(footerText),
     ],
   }));
 }
@@ -143,6 +144,7 @@ export async function updateListContent(state: AppState): Promise<void> {
   const total = state.landmarks.length;
   const current = state.selectedIndex + 1;
   const listText = formatLandmarkList(state.landmarks, state.selectedIndex);
+  const footerText = state.city || 'Scroll: browse  Tap: details';
 
   await bridge.textContainerUpgrade(new TextContainerUpgrade({
     containerID: 1,
@@ -158,5 +160,13 @@ export async function updateListContent(state: AppState): Promise<void> {
     contentOffset: 0,
     contentLength: 2000,
     content: listText,
+  }));
+
+  await bridge.textContainerUpgrade(new TextContainerUpgrade({
+    containerID: 3,
+    containerName: 'footer',
+    contentOffset: 0,
+    contentLength: 1000,
+    content: footerText,
   }));
 }

@@ -4,6 +4,7 @@ import { fetchLandmarks } from './api';
 import { renderStartup, renderList, renderError } from './renderer';
 import { setupEventHandlers } from './events';
 import { AppState } from './types';
+import { reverseGeocode } from './geocode';
 
 const state: AppState = {
   landmarks: [],
@@ -16,6 +17,16 @@ const FALLBACK_LAT = 38.8977;
 const FALLBACK_LNG = -77.0365;
 
 async function getLocation(): Promise<{ lat: number; lng: number }> {
+  // Allow overriding location via URL params (for simulator)
+  const params = new URLSearchParams(window.location.search);
+  const paramLat = parseFloat(params.get('lat') || '');
+  const paramLng = parseFloat(params.get('lng') || '');
+  if (Number.isFinite(paramLat) && Number.isFinite(paramLng)
+      && paramLat >= -90 && paramLat <= 90 && paramLng >= -180 && paramLng <= 180) {
+    console.log('[geo] using URL params');
+    return { lat: paramLat, lng: paramLng };
+  }
+
   try {
     return await getCurrentPosition();
   } catch (e) {
@@ -32,11 +43,14 @@ async function loadLandmarks(): Promise<void> {
 
     console.log('[app] getting location');
     const { lat, lng } = await getLocation();
-    console.log('[app] location:', lat, lng);
+    console.log('[app] location acquired');
 
     console.log('[app] fetching landmarks');
-    const landmarks = await fetchLandmarks(lat, lng);
-    console.log('[app] got landmarks:', landmarks.length);
+    const [landmarks, city] = await Promise.all([
+      fetchLandmarks(lat, lng),
+      reverseGeocode(lat, lng),
+    ]);
+    console.log('[app] got landmarks:', landmarks.length, 'city:', city);
 
     if (landmarks.length === 0) {
       state.mode = 'error';
@@ -48,6 +62,7 @@ async function loadLandmarks(): Promise<void> {
     state.landmarks = landmarks;
     state.selectedIndex = 0;
     state.mode = 'list';
+    state.city = city;
     await renderList(state);
   } catch (error) {
     console.error('[app] loadLandmarks error:', error);
