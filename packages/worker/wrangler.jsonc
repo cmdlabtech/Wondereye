@@ -1,0 +1,15 @@
+{
+  "name": "wondereye-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-04-01",
+  "routes": [
+    { "pattern": "api.wondereye.app", "custom_domain": true }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "LANDMARKS_CACHE",
+      "id": "ca0294af9e0c41c9ae59e17885fd7376",
+      "preview_id": "local-dev-cache"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "name": "wondereye-app",
+  "compatibility_date": "2025-04-01",
+  "routes": [
+    { "pattern": "wondereye.app", "custom_domain": true }
+  ],
+  "assets": {
+    "directory": "./dist"
+  }
+}
