@@ -6,7 +6,7 @@ import { Bindings, LandmarkResponse } from './types';
 
 const MAX_RADIUS = 2000;
 const MIN_RADIUS = 50;
-const CACHE_TTL = 86400; // 24 hours in seconds
+const CACHE_TTL = 604800; // 7 days — landmark history doesn't change
 const DETAIL_CACHE_TTL = 604800; // 7 days — landmark history doesn't change
 
 function cacheKey(lat: number, lng: number, radius: number): string {

@@ -45,3 +45,7 @@ npx evenhub-simulator "http://localhost:5173/app.html?lat=48.8566&lng=2.3522"
 ```
 
 Pass any `lat`/`lng` query params to simulate a location.
+
+## Roadmap
+
+- **Tunable Search Radius** — Settings toggle to choose between Precise Mode (accurate location + 100-200m radius for focused sightseeing) and Broad Mode (privacy-optimized location + 500m+ radius for general exploration)
