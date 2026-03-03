@@ -7,3 +7,10 @@ dist/
 *.ehpk
 .DS_Store
 .claude/
+# IDE
+.vscode/
+
+# Test/debug files
+test.html
+*test.ts
+*test.js
