@@ -4,10 +4,11 @@ import { DISPLAY_WIDTH, HEADER_HEIGHT, FOOTER_HEIGHT, VISIBLE_LANDMARKS } from '
 export const CONTENT_HEIGHT = DISPLAY_WIDTH === 576 ? 218 : (288 - HEADER_HEIGHT - FOOTER_HEIGHT);
 const ROW_H = Math.floor(CONTENT_HEIGHT / VISIBLE_LANDMARKS); // ~43px
 const ICON_SIZE = 20;
-const ICON_PAD = 6;
+const ICON_PAD = 8;
 const TEXT_X = ICON_PAD + ICON_SIZE + 8;
 const BORDER_MARGIN = 2;
 const FONT_SIZE = 19;
+const SELECTION_RADIUS = 6;
 
 // --- Icon drawing functions ---
 
@@ -179,12 +180,15 @@ export function renderListToCanvas(landmarks: Landmark[], selectedIndex: number)
     if (isSelected) {
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 1.5;
-      ctx.strokeRect(
+      ctx.beginPath();
+      ctx.roundRect(
         BORDER_MARGIN,
         rowY + BORDER_MARGIN,
         DISPLAY_WIDTH - BORDER_MARGIN * 2,
         ROW_H - BORDER_MARGIN * 2,
+        SELECTION_RADIUS,
       );
+      ctx.stroke();
     }
 
     ctx.fillStyle = fg;

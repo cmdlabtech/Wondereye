@@ -2,6 +2,16 @@
 
 Discover nearby landmarks through your Even G2 smart glasses. Wondereye uses your location to find points of interest via OpenStreetMap, then generates concise descriptions powered by Grok — displayed directly on the glasses.
 
+## Try It on Your Glasses
+
+Scan this QR code from the Even Hub app to load Wondereye instantly — no setup required.
+
+<p align="center">
+  <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://wondereye.app/app.html" alt="Scan to open Wondereye on your Even G2" width="200" height="200" />
+  <br/>
+  <a href="https://wondereye.app/app.html">wondereye.app/app.html</a>
+</p>
+
 ## Navigation
 
 - Tap a landmark to read a snippet, then tap again to load full details

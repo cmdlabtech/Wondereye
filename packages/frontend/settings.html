@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wondereye Settings</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #000;
+      color: #fff;
+      font-family: 'Even Roster Grotesk', system-ui, -apple-system, sans-serif;
+      font-size: 20px;
+      font-weight: 400;
+      letter-spacing: 0;
+      padding: 24px 16px;
+      min-height: 100vh;
+    }
+
+    h1 {
+      font-size: 20px;
+      font-weight: 400;
+      margin-bottom: 24px;
+      opacity: 0.6;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .section-label {
+      font-size: 16px;
+      opacity: 0.5;
+      margin-bottom: 8px;
+      padding-left: 4px;
+    }
+
+    .option-list {
+      list-style: none;
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .option-list li {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 16px;
+      cursor: pointer;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      transition: background 0.1s;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    .option-list li:last-child {
+      border-bottom: none;
+    }
+
+    .option-list li:active {
+      background: rgba(255,255,255,0.06);
+    }
+
+    .option-list li.selected {
+      border: 1.5px solid #fff;
+      border-radius: 6px;
+      margin: 2px;
+    }
+
+    .indicator {
+      font-size: 14px;
+      width: 16px;
+      flex-shrink: 0;
+    }
+
+    .option-list li.selected .indicator::before {
+      content: '▶';
+    }
+
+    .option-title {
+      flex: 1;
+    }
+
+    .option-sub {
+      font-size: 15px;
+      opacity: 0.45;
+      margin-top: 2px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Settings</h1>
+
+  <p class="section-label">Distance Units</p>
+  <ul class="option-list" id="units-list">
+    <li data-value="imperial" onclick="selectUnit(this)">
+      <span class="indicator"></span>
+      <div>
+        <div class="option-title">Imperial</div>
+        <div class="option-sub">Miles &amp; feet</div>
+      </div>
+    </li>
+    <li data-value="metric" onclick="selectUnit(this)">
+      <span class="indicator"></span>
+      <div>
+        <div class="option-title">Metric</div>
+        <div class="option-sub">Kilometres &amp; metres</div>
+      </div>
+    </li>
+  </ul>
+
+  <script>
+    const KEY = 'wondereye-units';
+
+    function selectUnit(el) {
+      document.querySelectorAll('#units-list li').forEach(li => li.classList.remove('selected'));
+      el.classList.add('selected');
+      localStorage.setItem(KEY, el.dataset.value);
+    }
+
+    // Restore saved preference on load
+    const saved = localStorage.getItem(KEY) || 'imperial';
+    const match = document.querySelector(`[data-value="${saved}"]`);
+    if (match) match.classList.add('selected');
+  </script>
+</body>
+</html>

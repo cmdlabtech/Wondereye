@@ -8,6 +8,7 @@ import {
 } from '@evenrealities/even_hub_sdk';
 import { getBridge } from './bridge';
 import { AppState, Landmark } from './types';
+import { getUnits } from './units';
 import { DISPLAY_WIDTH, DISPLAY_HEIGHT, HEADER_HEIGHT, FOOTER_HEIGHT, VISIBLE_LANDMARKS } from './constants';
 import { renderListToCanvas, canvasToPng, CONTENT_HEIGHT } from './canvas-list';
 
@@ -23,7 +24,7 @@ function makeHeader(text: string): TextContainerProperty {
     height: HEADER_HEIGHT,
     borderWidth: 1,
     borderColor: 8,
-    borderRdaius: 0,
+    borderRdaius: 6,
     paddingLength: 4,
     content: text,
     isEventCapture: 0,
@@ -59,7 +60,25 @@ function makeContent(text: string): TextContainerProperty {
     height: LIST_HEIGHT,
     borderWidth: 0,
     borderColor: 0,
-    borderRdaius: 0,
+    borderRdaius: 6,
+    paddingLength: 4,
+    content: text,
+    isEventCapture: 0,
+  });
+}
+
+// Interactive content: outlined border per Even OS 2.0 spec (outline = tappable)
+function makeInteractiveContent(text: string): TextContainerProperty {
+  return new TextContainerProperty({
+    containerID: 2,
+    containerName: 'content',
+    xPosition: 0,
+    yPosition: HEADER_HEIGHT,
+    width: DISPLAY_WIDTH,
+    height: LIST_HEIGHT,
+    borderWidth: 1,
+    borderColor: 8,
+    borderRdaius: 6,
     paddingLength: 4,
     content: text,
     isEventCapture: 0,
@@ -76,7 +95,7 @@ function makeFooter(text: string): TextContainerProperty {
     height: FOOTER_HEIGHT,
     borderWidth: 1,
     borderColor: 5,
-    borderRdaius: 0,
+    borderRdaius: 6,
     paddingLength: 4,
     content: text,
     isEventCapture: 0,
@@ -94,6 +113,9 @@ function footerBoth(left: string, right: string): string {
 }
 
 function formatDistance(meters: number): string {
+  if (getUnits() === 'metric') {
+    return meters < 1000 ? `${Math.round(meters)}m` : `${(meters / 1000).toFixed(1)}km`;
+  }
   const miles = meters / 1609.344;
   return miles < 0.1 ? `${Math.round(meters * 3.281)}ft` : `${miles.toFixed(1)}mi`;
 }
@@ -197,7 +219,7 @@ export async function renderDetail(landmark: Landmark): Promise<void> {
     containerTotalNum: 4,
     textObject: [
       makeDetailHeader(landmark.name, landmark.distance),
-      makeContent(landmark.snippet),
+      makeInteractiveContent(landmark.snippet),
       makeFooter(footerBoth('\u2193 Read more  Tap: back', 'Wondereye')),
       makeEventCapture(),
     ],
@@ -216,8 +238,9 @@ export function paginateText(text: string): string[] {
       pages.push(remaining);
       break;
     }
-    // Break at last space before the limit
-    let cut = remaining.lastIndexOf(' ', CHARS_PER_PAGE);
+    // Prefer breaking after a sentence-ending period within the limit
+    const sentenceCut = remaining.lastIndexOf('. ', CHARS_PER_PAGE);
+    let cut = sentenceCut > 0 ? sentenceCut + 1 : remaining.lastIndexOf(' ', CHARS_PER_PAGE);
     if (cut <= 0) cut = CHARS_PER_PAGE;
     pages.push(remaining.slice(0, cut));
     remaining = remaining.slice(cut).trimStart();

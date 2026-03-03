@@ -13,7 +13,8 @@
     "deploy:frontend": "npm run deploy --workspace=packages/frontend",
     "deploy:worker": "npm run deploy --workspace=packages/worker",
     "deploy": "npm run deploy:worker && npm run deploy:frontend",
-    "qr": "evenhub qr --http --ip 192.168.86.100 --port 5173"
+    "qr": "evenhub qr --http --ip 192.168.86.100 --port 5173",
+    "qr:prod": "evenhub qr -u https://wondereye.app/app.html"
   },
   "devDependencies": {
     "@evenrealities/evenhub-cli": "^0.1.5",

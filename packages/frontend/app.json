@@ -4,5 +4,6 @@
   "name": "Wondereye",
   "description": "Look out, not down. Discover landmarks through your glasses.",
   "permissions": ["location"],
-  "entry": "app.html"
+  "entry": "app.html",
+  "settings": "settings.html"
 }
