@@ -3,10 +3,13 @@ import {
   RebuildPageContainer,
   TextContainerProperty,
   TextContainerUpgrade,
+  ImageContainerProperty,
+  ImageRawDataUpdate,
 } from '@evenrealities/even_hub_sdk';
 import { getBridge } from './bridge';
 import { AppState, Landmark } from './types';
 import { DISPLAY_WIDTH, DISPLAY_HEIGHT, HEADER_HEIGHT, FOOTER_HEIGHT, VISIBLE_LANDMARKS } from './constants';
+import { renderListToCanvas, canvasToPng, CONTENT_HEIGHT } from './canvas-list';
 
 const LIST_HEIGHT = DISPLAY_HEIGHT - HEADER_HEIGHT - FOOTER_HEIGHT;
 
@@ -79,6 +82,16 @@ function makeFooter(text: string): TextContainerProperty {
     isEventCapture: 0,
   });
 }
+// Footer width: 576px, 4px padding each side ≈ 94 chars at ~6.2px avg
+const FOOTER_COLS = 94;
+
+function footerRight(right: string): string {
+  return ' '.repeat(Math.max(0, FOOTER_COLS - right.length)) + right;
+}
+
+function footerBoth(left: string, right: string): string {
+  return left + ' '.repeat(Math.max(1, FOOTER_COLS - left.length - right.length)) + right;
+}
 
 function formatDistance(meters: number): string {
   const miles = meters / 1609.344;
@@ -95,15 +108,38 @@ function truncate(text: string, maxLen: number): string {
   return text.length <= maxLen ? text : text.slice(0, maxLen - 3) + '...';
 }
 
+function landmarkSymbol(type: string): string {
+  switch (type) {
+    case 'castle':              return '\u25B2'; // ▲ triangle (turret)
+    case 'cathedral':
+    case 'church':
+    case 'place_of_worship':
+    case 'mosque':
+    case 'temple':              return '+';      // cross
+    case 'synagogue':           return '\u2605'; // ★ star
+    case 'museum':              return '\u25A0'; // ■ square (building)
+    case 'gallery':
+    case 'artwork':             return '\u25C8'; // ◈ diamond+square
+    case 'monument':
+    case 'memorial':            return '|';      // pillar
+    case 'archaeological_site': return '~';      // tilde
+    case 'theatre':             return '\u266A'; // ♪ music note
+    case 'library':             return '=';      // lines
+    case 'viewpoint':           return '\u25CE'; // ◎ bullseye
+    case 'attraction':          return '\u2605'; // ★ star
+    default:                    return '\u25C6'; // ◆ diamond
+  }
+}
+
 export function formatLandmarkList(landmarks: Landmark[], selectedIndex: number): string {
   const lines: string[] = [];
-  const start = Math.max(0, selectedIndex - 2);
+  const start = Math.max(0, selectedIndex - (VISIBLE_LANDMARKS - 1));
   const end = Math.min(landmarks.length, start + VISIBLE_LANDMARKS);
 
   for (let i = start; i < end; i++) {
     const lm = landmarks[i];
     const pointer = i === selectedIndex ? '\u25B6' : ' ';
-    lines.push(`${pointer} ${truncate(lm.name, 45)}`);
+    lines.push(`${pointer} ${landmarkSymbol(lm.type)} ${truncate(lm.name, 43)}`);
   }
 
   return lines.join('\n');
@@ -116,7 +152,7 @@ export async function renderStartup(): Promise<void> {
     textObject: [
       makeHeader('Wondereye'),
       makeContent('Getting your location...'),
-      makeFooter('Please wait'),
+      makeFooter(footerBoth('Please wait', 'Wondereye')),
       makeEventCapture(),
     ],
   }));
@@ -130,10 +166,27 @@ export async function renderList(state: AppState): Promise<void> {
     containerTotalNum: 4,
     textObject: [
       makeHeader('Nearby Landmarks'),
-      makeContent(formatLandmarkList(state.landmarks, state.selectedIndex)),
-      makeFooter(footerText),
+      makeFooter(footerBoth(footerText, 'Wondereye')),
       makeEventCapture(),
     ],
+    imageObject: [
+      new ImageContainerProperty({
+        containerID: 2,
+        containerName: 'content',
+        xPosition: 0,
+        yPosition: HEADER_HEIGHT,
+        width: DISPLAY_WIDTH,
+        height: CONTENT_HEIGHT,
+      }),
+    ],
+  }));
+
+  const canvas = renderListToCanvas(state.landmarks, state.selectedIndex);
+  const png = await canvasToPng(canvas);
+  await bridge.updateImageRawData(new ImageRawDataUpdate({
+    containerID: 2,
+    containerName: 'content',
+    imageData: png,
   }));
 }
 
@@ -145,14 +198,14 @@ export async function renderDetail(landmark: Landmark): Promise<void> {
     textObject: [
       makeDetailHeader(landmark.name, landmark.distance),
       makeContent(landmark.snippet),
-      makeFooter('\u2193 Read more  Tap: back'),
+      makeFooter(footerBoth('\u2193 Read more  Tap: back', 'Wondereye')),
       makeEventCapture(),
     ],
   }));
 }
 
-// ~10 lines visible in 218px content area, ~55 chars per line
-const CHARS_PER_PAGE = 500;
+// 218px content area, ~26px/line ≈ 8 lines, ~55 chars/line ≈ 440 chars max; use 350 for safe margin
+const CHARS_PER_PAGE = 350;
 
 export function paginateText(text: string): string[] {
   if (!text) return ['No additional details available.'];
@@ -172,11 +225,13 @@ export function paginateText(text: string): string[] {
   return pages;
 }
 
-export async function renderReadingPage(landmark: Landmark, page: string, _pageNum: number, totalPages: number): Promise<void> {
+export async function renderReadingPage(landmark: Landmark, page: string, _pageNum: number, totalPages: number, loading = false, detailLoaded = false): Promise<void> {
   const bridge = getBridge();
-  const footer = totalPages > 1
-    ? `\u2191\u2193 Scroll  Tap: back`
-    : 'Tap: back';
+  const hint = loading ? 'Loading details...'
+    : !detailLoaded && totalPages <= 1 ? 'Tap: Load More'
+    : totalPages > 1 ? '\u2191\u2193 Scroll'
+    : '';
+  const footer = hint ? footerBoth(hint, 'Wondereye') : footerRight('Wondereye');
 
   await bridge.rebuildPageContainer(new RebuildPageContainer({
     containerTotalNum: 4,
@@ -225,7 +280,7 @@ export async function renderError(message: string): Promise<void> {
     textObject: [
       makeHeader('Error'),
       makeContent(message),
-      makeFooter('Tap: retry'),
+      makeFooter(footerBoth('Tap: retry', 'Wondereye')),
       makeEventCapture(),
     ],
   }));
@@ -233,14 +288,11 @@ export async function renderError(message: string): Promise<void> {
 
 export async function updateListContent(state: AppState): Promise<void> {
   const bridge = getBridge();
-  const listText = formatLandmarkList(state.landmarks, state.selectedIndex);
-
-  // Only update the content container on scroll to avoid multi-container redraw flicker
-  await bridge.textContainerUpgrade(new TextContainerUpgrade({
+  const canvas = renderListToCanvas(state.landmarks, state.selectedIndex);
+  const png = await canvasToPng(canvas);
+  await bridge.updateImageRawData(new ImageRawDataUpdate({
     containerID: 2,
     containerName: 'content',
-    contentOffset: 0,
-    contentLength: listText.length,
-    content: listText,
+    imageData: png,
   }));
 }

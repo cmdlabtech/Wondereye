@@ -8,10 +8,11 @@ export interface Landmark {
 export interface AppState {
   landmarks: Landmark[];
   selectedIndex: number;
-  mode: 'loading' | 'list' | 'detail' | 'reading' | 'error';
+  mode: 'loading' | 'list' | 'reading' | 'error';
   errorMessage?: string;
   city?: string;
   detailText?: string;
   readingPage?: number;
   readingPages?: string[];
+  detailLoaded?: boolean;
 }

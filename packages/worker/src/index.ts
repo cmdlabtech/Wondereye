@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { queryOverpass } from './overpass';
-import { generateSnippets } from './claude';
+import { generateSnippets } from './grok';
 import { Bindings, LandmarkResponse } from './types';
 
 const MAX_RADIUS = 2000;
@@ -144,11 +144,11 @@ app.post('/api/landmark-detail', async (c) => {
         messages: [
           {
             role: 'system',
-            content: 'You are a knowledgeable tour guide. Use Grokipedia to provide accurate, factual information. Write in plain text with no markdown, no bullet points, no special formatting.',
+            content: 'You are a knowledgeable tour guide. Look up every landmark in Grokipedia first to ensure accurate, factual information. Write in plain text with no markdown, no bullet points, no special formatting.',
           },
           {
             role: 'user',
-            content: `Give a concise background on the landmark "${name}". Include what it is, its history, why it's notable, and one interesting fact. Keep it under 800 characters.`,
+            content: `Using Grokipedia, give a concise background on the landmark "${name}". Include what it is, its history, why it's notable, and one interesting fact. Keep it under 800 characters.`,
           },
         ],
       }),

@@ -19,7 +19,7 @@ export async function generateSnippets(
       messages: [
         {
           role: 'system',
-          content: 'You are a concise tour guide for smart glasses with a tiny display. Use Grokipedia to provide accurate, factual information. Return ONLY valid JSON with no other text.',
+          content: 'You are a concise tour guide for smart glasses with a tiny display. For every landmark, look it up in Grokipedia first to ensure accurate, factual information. Return ONLY valid JSON with no other text.',
         },
         {
           role: 'user',

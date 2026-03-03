@@ -2,6 +2,18 @@
 
 Discover nearby landmarks through your Even G2 smart glasses. Wondereye uses your location to find points of interest via OpenStreetMap, then generates concise descriptions powered by Grok — displayed directly on the glasses.
 
+## Navigation
+
+Controls use the G2's touch frame (swipe up/down = scroll, single tap, double tap).
+
+| View | Scroll down | Scroll up | Tap | Double tap |
+|------|-------------|-----------|-----|------------|
+| **List** | Next landmark | Previous landmark | Open snippet | Refresh |
+| **Reading** | Next page | Previous page | Load full details | Back to list |
+
+- Landmark details are loaded on demand (first tap in reading view) — not automatically.
+- Scroll up on the first page stays on the reading view; double tap always goes back.
+
 ## Architecture
 
 - **Frontend** (`packages/frontend`) — Vite app that runs as a G2 WebView. Renders landmark lists and detail views on the glasses display using the EvenHub SDK.

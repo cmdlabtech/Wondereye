@@ -1,7 +1,7 @@
 import { OsEventTypeList } from '@evenrealities/even_hub_sdk';
 import { getBridge } from './bridge';
 import { AppState } from './types';
-import { renderList, renderDetail, renderReadingPage, renderLoading, stopLoading, updateListContent, paginateText } from './renderer';
+import { renderList, renderReadingPage, updateListContent, paginateText } from './renderer';
 import { fetchLandmarkDetail } from './api';
 
 export function setupEventHandlers(
@@ -16,9 +16,6 @@ export function setupEventHandlers(
       event.listEvent?.eventType ??
       event.sysEvent?.eventType;
 
-    // G2 guide: SDK's fromJson normalises 0 to undefined in many cases.
-    // Check both CLICK_EVENT (0) and undefined to catch clicks.
-    // Simulator sends sysEvent:{} for click (no eventType field).
     if (eventType == null && (event.sysEvent || event.textEvent || event.listEvent)) {
       eventType = OsEventTypeList.CLICK_EVENT;
     }
@@ -26,12 +23,13 @@ export function setupEventHandlers(
     if (eventType == null) return;
 
     try {
-      // Double-tap goes back in any view
       if (eventType === OsEventTypeList.DOUBLE_CLICK_EVENT) {
-        if (state.mode === 'detail' || state.mode === 'reading') {
+        // Double-tap always goes back to list from any view
+        if (state.mode === 'reading') {
           state.mode = 'list';
           state.readingPage = undefined;
           state.readingPages = undefined;
+          state.detailLoaded = undefined;
           await renderList(state);
         } else {
           onRefresh();
@@ -40,19 +38,10 @@ export function setupEventHandlers(
       }
 
       switch (state.mode) {
-        case 'list':
-          await handleListEvent(eventType, state);
-          break;
-        case 'detail':
-          await handleDetailEvent(eventType, state);
-          break;
-        case 'reading':
-          await handleReadingEvent(eventType, state);
-          break;
+        case 'list':    await handleListEvent(eventType, state); break;
+        case 'reading': await handleReadingEvent(eventType, state); break;
         case 'error':
-          if (eventType === OsEventTypeList.CLICK_EVENT) {
-            onRefresh();
-          }
+          if (eventType === OsEventTypeList.CLICK_EVENT) onRefresh();
           break;
       }
     } catch (err) {
@@ -77,91 +66,60 @@ async function handleListEvent(eventType: number, state: AppState): Promise<void
       }
       break;
 
-    case OsEventTypeList.CLICK_EVENT:
-      state.mode = 'detail';
-      await renderDetail(state.landmarks[state.selectedIndex]);
-      break;
-  }
-}
-
-async function handleDetailEvent(eventType: number, state: AppState): Promise<void> {
-  switch (eventType) {
-    case OsEventTypeList.CLICK_EVENT:
-      state.mode = 'list';
-      await renderList(state);
-      break;
-
-    case OsEventTypeList.SCROLL_BOTTOM_EVENT: {
+    case OsEventTypeList.CLICK_EVENT: {
       const landmark = state.landmarks[state.selectedIndex];
-
-      // Reuse cached detail if already fetched
-      if (state.readingPages && state.readingPages.length > 0) {
-        state.readingPage = 0;
-        state.mode = 'reading';
-        await renderReadingPage(landmark, state.readingPages[0], 0, state.readingPages.length);
-        break;
-      }
-
-      // Fetch extended details via Grok
-      await renderLoading();
-      try {
-        const detail = await fetchLandmarkDetail(landmark.name);
-        stopLoading();
-        state.detailText = detail;
-        state.readingPages = paginateText(detail);
-        state.readingPage = 0;
-        state.mode = 'reading';
-        await renderReadingPage(landmark, state.readingPages[0], 0, state.readingPages.length);
-      } catch {
-        stopLoading();
-        state.mode = 'reading';
-        state.detailText = '';
-        state.readingPages = ['No additional details available.'];
-        state.readingPage = 0;
-        await renderReadingPage(landmark, state.readingPages[0], 0, 1);
-      }
+      // Show snippet only — tap within reading view triggers detail load
+      state.mode = 'reading';
+      state.detailLoaded = false;
+      state.readingPages = paginateText(landmark.snippet);
+      state.readingPage = 0;
+      await renderReadingPage(landmark, state.readingPages[0], 0, state.readingPages.length, false, false);
       break;
     }
-
-    case OsEventTypeList.SCROLL_TOP_EVENT:
-      // No action — double-tap to go back to list
-      break;
   }
 }
 
 async function handleReadingEvent(eventType: number, state: AppState): Promise<void> {
   const pages = state.readingPages || [];
-  const page = state.readingPage || 0;
+  const page = state.readingPage ?? 0;
   const landmark = state.landmarks[state.selectedIndex];
 
   switch (eventType) {
     case OsEventTypeList.CLICK_EVENT:
-      // Tap goes back to list
-      state.mode = 'list';
-      state.detailText = undefined;
-      state.readingPage = undefined;
-      state.readingPages = undefined;
-      await renderList(state);
+      // Tap in reading view: load Grok details if not already loaded
+      if (!state.detailLoaded) {
+        state.detailLoaded = true;
+        await renderReadingPage(landmark, pages[page], page, pages.length, true, true);
+        fetchLandmarkDetail(landmark.name).then(async detail => {
+          if (state.mode !== 'reading' || state.landmarks[state.selectedIndex] !== landmark) return;
+          const combined = landmark.snippet + (detail ? '\n\n' + detail + '\n' : '');
+          state.readingPages = paginateText(combined);
+          state.readingPage = Math.min(state.readingPage ?? 0, state.readingPages.length - 1);
+          await renderReadingPage(
+            landmark,
+            state.readingPages[state.readingPage],
+            state.readingPage,
+            state.readingPages.length,
+            false,
+            true,
+          );
+        }).catch(() => { /* snippet already showing — silently ignore */ });
+      }
       break;
 
     case OsEventTypeList.SCROLL_BOTTOM_EVENT:
       if (page < pages.length - 1) {
-        // Next page of text
         state.readingPage = page + 1;
-        await renderReadingPage(landmark, pages[page + 1], page + 1, pages.length);
+        await renderReadingPage(landmark, pages[page + 1], page + 1, pages.length, false, !!state.detailLoaded);
       }
       break;
 
     case OsEventTypeList.SCROLL_TOP_EVENT:
       if (page > 0) {
-        // Previous page of text
         state.readingPage = page - 1;
-        await renderReadingPage(landmark, pages[page - 1], page - 1, pages.length);
-      } else {
-        // At first page, scroll up goes back to snippet (keep cached detail)
-        state.mode = 'detail';
-        await renderDetail(landmark);
+        await renderReadingPage(landmark, pages[page - 1], page - 1, pages.length, false, !!state.detailLoaded);
       }
+      // At page 0: do nothing — only double-tap goes back
       break;
   }
 }
