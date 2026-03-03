@@ -7,6 +7,7 @@ import { Bindings, LandmarkResponse } from './types';
 const MAX_RADIUS = 2000;
 const MIN_RADIUS = 50;
 const CACHE_TTL = 86400; // 24 hours in seconds
+const DETAIL_CACHE_TTL = 604800; // 7 days — landmark history doesn't change
 
 function cacheKey(lat: number, lng: number, radius: number): string {
   return `landmarks:${lat.toFixed(3)}:${lng.toFixed(3)}:${radius}`;
@@ -133,6 +134,12 @@ app.post('/api/landmark-detail', async (c) => {
     return c.json({ error: 'name is required (string, max 200 chars)' }, 400);
   }
 
+  const detailKey = `detail:${name.toLowerCase().trim()}`;
+  const cachedDetail = await c.env.LANDMARKS_CACHE.get(detailKey, 'json');
+  if (cachedDetail) {
+    return c.json(cachedDetail);
+  }
+
   try {
     const res = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
@@ -162,6 +169,13 @@ app.post('/api/landmark-detail', async (c) => {
 
     const data: any = await res.json();
     const text = data.choices?.[0]?.message?.content || '';
+    if (text) {
+      c.executionCtx.waitUntil(
+        c.env.LANDMARKS_CACHE.put(detailKey, JSON.stringify({ detail: text }), {
+          expirationTtl: DETAIL_CACHE_TTL,
+        })
+      );
+    }
     return c.json({ detail: text });
   } catch (err) {
     console.error('[api] landmark-detail error:', err);
