@@ -46,6 +46,7 @@ app.use('/*', async (c, next) => {
   const origins = allowed.split(',').map((o) => o.trim());
   const middleware = cors({
     origin: (reqOrigin) => origins.includes(reqOrigin) ? reqOrigin : '',
+    allowMethods: ['GET', 'POST', 'OPTIONS'],
   });
   return middleware(c, next);
 });
