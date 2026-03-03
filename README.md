@@ -25,22 +25,20 @@ npm run dev   # starts frontend + worker
 npm run qr    # generates QR code to sideload on glasses (requires local network)
 ```
 
-Create `packages/worker/.dev.vars` with your API keys:
+Create `packages/worker/.dev.vars` with your API key and Allowed Origins:
 
 ```
 XAI_API_KEY=your-xai-api-key
 ALLOWED_ORIGIN=http://localhost:5173
 ```
 
-## Deploy
+## Locally Deploy & Test
 
 ```bash
 npm run deploy
 ```
 
-Set `XAI_API_KEY` and `ALLOWED_ORIGIN` as Cloudflare Worker secrets via `wrangler secret put`.
-
-## Testing with the Simulator
+### Testing with the Simulator
 
 ```bash
 npx evenhub-simulator "http://localhost:5173/app.html?lat=48.8566&lng=2.3522"
