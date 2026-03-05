@@ -1,11 +1,16 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import { resolve } from 'path';
+
+// Load .env.local for dev IP configuration
+const env = loadEnv('development', process.cwd());
+const devHost = env.VITE_DEV_IP || '192.168.86.100';
 
 export default defineConfig({
   root: '.',
   publicDir: 'public',
   server: {
-    host: '0.0.0.0',
+    host: devHost,
+    port: 5173,
   },
   build: {
     outDir: 'dist',

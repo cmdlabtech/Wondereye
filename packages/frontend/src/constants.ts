@@ -8,12 +8,13 @@ export const FOOTER_HEIGHT = 30;
 export const LIST_HEIGHT = DISPLAY_HEIGHT - HEADER_HEIGHT - FOOTER_HEIGHT; // 218px
 
 // API
+const devHost = import.meta.env.VITE_DEV_IP || '192.168.86.100';
 export const API_BASE_URL = import.meta.env.DEV
-  ? 'http://localhost:8787'
+  ? `http://${devHost}:8787`
   : 'https://api.wondereye.app';
 
 // Geolocation
-export const GEO_TIMEOUT = 10000;
+export const GEO_TIMEOUT = 5000;
 export const GEO_MAX_AGE = 60000;
 export const SEARCH_RADIUS = 2000;
 

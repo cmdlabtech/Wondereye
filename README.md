@@ -19,32 +19,59 @@ Scan this QR code from the Even Hub app to load Wondereye instantly — no setup
 
 ## Development
 
+### Setup
+
 ```bash
 npm install
-npm run dev   # starts frontend + worker
-npm run qr    # generates QR code to sideload on glasses (requires local network)
+
+# Create worker secrets
+# Copy to packages/worker/.dev.vars:
+#   XAI_API_KEY=your-xai-api-key
+#   ALLOWED_ORIGIN=http://192.168.86.100:5173  (use your dev machine IP)
 ```
 
-Create `packages/worker/.dev.vars` with your API key and Allowed Origins:
+### Running Dev Servers
 
-```
-XAI_API_KEY=your-xai-api-key
-ALLOWED_ORIGIN=http://localhost:5173
-```
-
-## Locally Deploy & Test
+For testing on physical glasses or remote simulators, set your dev machine's IP:
 
 ```bash
-npm run deploy
+# Edit packages/frontend/.env.local with your network IP
+# (e.g., 192.168.86.100 or 192.168.1.100)
+cat packages/frontend/.env.local
+
+# Then run all servers:
+bash scripts/dev-local.sh
+
+# OR manually in 3 terminals:
+cd packages/frontend && npm run dev
+cd packages/worker && wrangler dev --ip YOUR_IP --port 8787
+npm run qr  # scan QR code with Even Hub app on glasses
+```
+
+For desktop/simulator testing with localhost:
+
+```bash
+npm run dev   # starts frontend on localhost:5173
+npm run qr    # generates QR code
 ```
 
 ### Testing with the Simulator
 
 ```bash
+# With network IP (physical glasses):
+npx evenhub-simulator "http://192.168.86.100:5173/app.html?lat=48.8566&lng=2.3522"
+
+# With localhost (desktop/emulator):
 npx evenhub-simulator "http://localhost:5173/app.html?lat=48.8566&lng=2.3522"
 ```
 
 Pass any `lat`/`lng` query params to simulate a location.
+
+## Deployment
+
+```bash
+npm run deploy
+```
 
 ## Roadmap
 
