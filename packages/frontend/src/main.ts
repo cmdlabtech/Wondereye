@@ -1,6 +1,7 @@
 import { initBridge } from './bridge';
+import { getBridge } from './bridge';
 import { getCurrentPosition, LocationError } from './geo';
-import { fetchLandmarks } from './api';
+import { fetchLandmarks, fetchUserLocation } from './api';
 import { renderStartup, renderList, renderError } from './renderer';
 import { setupEventHandlers } from './events';
 import { AppState } from './types';
@@ -16,6 +17,34 @@ const state: AppState = {
 const FALLBACK_LAT = 50.090167;
 const FALLBACK_LNG = 14.401917;
 
+function setPhoneStatus(text: string) {
+  const el = document.getElementById('connection-status');
+  if (el) el.textContent = text;
+}
+
+function setPhoneDot(id: string, state: 'active' | 'loading' | 'off') {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.className = 'dot' + (state !== 'off' ? ' ' + state : '');
+}
+
+function setPhoneLocationStatus(text: string, active = false) {
+  const el = document.getElementById('location-status');
+  if (el) el.textContent = text;
+  setPhoneDot('location-dot', active ? 'active' : 'off');
+}
+
+function showPhoneSetupLink(uid: number) {
+  const section = document.getElementById('setup-section');
+  const urlBox = document.getElementById('setup-url');
+  if (!section || !urlBox) return;
+  const url = `${window.location.origin}/?uid=${uid}`;
+  urlBox.textContent = url;
+  // Expose to the inline copy script
+  (window as any)._setupUrl = url;
+  section.style.display = 'block';
+}
+
 async function getLocation(): Promise<{ lat: number; lng: number }> {
   // Allow overriding location via URL params (for simulator)
   const params = new URLSearchParams(window.location.search);
@@ -27,12 +56,20 @@ async function getLocation(): Promise<{ lat: number; lng: number }> {
     return { lat: paramLat, lng: paramLng };
   }
 
+  // Try location stored via the homepage (uid-based)
+  if (state.uid) {
+    const stored = await fetchUserLocation(state.uid);
+    if (stored) {
+      console.log('[geo] using stored location for uid', state.uid);
+      return stored;
+    }
+    console.log('[geo] no stored location for uid', state.uid);
+  }
+
   try {
     return await getCurrentPosition();
   } catch (e) {
     const locErr = e as LocationError;
-    // Fall back to Prague for all failures (denied, timeout, unavailable)
-    // On real glasses, the phone GPS handles location via the Even App
     console.warn('[geo] location failed, using Prague fallback:', locErr.code, locErr.message);
     return { lat: FALLBACK_LAT, lng: FALLBACK_LNG };
   }
@@ -45,6 +82,7 @@ async function loadLandmarks(): Promise<void> {
     await renderStartup();
 
     console.log('[app] getting location');
+    setPhoneLocationStatus('Getting location...');
     const { lat, lng } = await getLocation();
     console.log('[app] location acquired');
 
@@ -54,6 +92,8 @@ async function loadLandmarks(): Promise<void> {
       reverseGeocode(lat, lng),
     ]);
     console.log('[app] got landmarks:', landmarks.length, 'city:', city);
+
+    setPhoneLocationStatus(city || `${lat.toFixed(3)}, ${lng.toFixed(3)}`, true);
 
     if (landmarks.length === 0) {
       state.mode = 'error';
@@ -71,7 +111,6 @@ async function loadLandmarks(): Promise<void> {
     console.error('[app] loadLandmarks error:', error);
     state.mode = 'error';
 
-    // Show specific messages for location permission errors
     const locErr = error as LocationError;
     if (locErr.code === 'denied') {
       state.errorMessage = locErr.message;
@@ -90,25 +129,37 @@ async function loadLandmarks(): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  const statusEl = document.getElementById('status');
   console.log('[app] starting');
 
   try {
-    if (statusEl) statusEl.textContent = 'Connecting to glasses...';
+    setPhoneStatus('Connecting...');
+    setPhoneDot('connection-dot', 'loading');
     console.log('[app] waiting for bridge');
     await initBridge();
     console.log('[app] bridge ready');
 
-    if (statusEl) statusEl.textContent = 'Connected. Loading landmarks...';
+    setPhoneStatus('Connected');
+    setPhoneDot('connection-dot', 'active');
+
+    // Get Even user uid for location persistence
+    try {
+      const user = await getBridge().getUserInfo();
+      if (user?.uid) {
+        state.uid = user.uid;
+        showPhoneSetupLink(user.uid);
+        console.log('[app] uid:', user.uid);
+      }
+    } catch (e) {
+      console.warn('[app] getUserInfo failed:', e);
+    }
+
     setupEventHandlers(state, loadLandmarks);
-
     await loadLandmarks();
-
-    if (statusEl) statusEl.textContent = 'App running on glasses.';
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Unknown error';
     console.error('[app] main error:', msg, error);
-    if (statusEl) statusEl.textContent = `Error: ${msg}`;
+    setPhoneStatus(`Error: ${msg}`);
+    setPhoneDot('connection-dot', 'off');
   }
 }
 

@@ -183,6 +183,42 @@ app.post('/api/landmark-detail', async (c) => {
   }
 });
 
+app.get('/api/location', async (c) => {
+  const uid = c.req.query('uid');
+  if (!uid || !/^\d+$/.test(uid)) {
+    return c.json({ error: 'uid is required' }, 400);
+  }
+  const data = await c.env.LANDMARKS_CACHE.get(`user-location:${uid}`, 'json') as { lat: number; lng: number } | null;
+  if (!data) return c.json({ error: 'Not found' }, 404);
+  return c.json(data);
+});
+
+app.post('/api/location', async (c) => {
+  let body: any;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: 'Invalid JSON body' }, 400);
+  }
+
+  const { uid, lat, lng } = body;
+  if (!uid || typeof uid !== 'number' || !Number.isInteger(uid) || uid <= 0) {
+    return c.json({ error: 'uid must be a positive integer' }, 400);
+  }
+  if (typeof lat !== 'number' || typeof lng !== 'number' ||
+      lat < -90 || lat > 90 || lng < -180 || lng > 180 ||
+      !Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return c.json({ error: 'Invalid coordinates' }, 400);
+  }
+
+  await c.env.LANDMARKS_CACHE.put(
+    `user-location:${uid}`,
+    JSON.stringify({ lat, lng }),
+    { expirationTtl: 31536000 } // 1 year
+  );
+  return c.json({ ok: true });
+});
+
 app.get('/health', (c) => c.json({ status: 'ok' }));
 
 export default app;

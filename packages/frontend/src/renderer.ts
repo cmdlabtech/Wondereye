@@ -3,14 +3,11 @@ import {
   RebuildPageContainer,
   TextContainerProperty,
   TextContainerUpgrade,
-  ImageContainerProperty,
-  ImageRawDataUpdate,
 } from '@evenrealities/even_hub_sdk';
 import { getBridge } from './bridge';
 import { AppState, Landmark } from './types';
 import { getUnits } from './units';
 import { DISPLAY_WIDTH, DISPLAY_HEIGHT, HEADER_HEIGHT, FOOTER_HEIGHT, VISIBLE_LANDMARKS } from './constants';
-import { renderListToCanvas, canvasToPng, CONTENT_HEIGHT } from './canvas-list';
 
 const LIST_HEIGHT = DISPLAY_HEIGHT - HEADER_HEIGHT - FOOTER_HEIGHT;
 
@@ -45,7 +42,7 @@ function makeEventCapture(): TextContainerProperty {
     borderColor: 0,
     borderRdaius: 0,
     paddingLength: 0,
-    content: '',
+    content: ' ',
     isEventCapture: 1,
   });
 }
@@ -145,7 +142,7 @@ function landmarkSymbol(type: string): string {
     case 'monument':
     case 'memorial':            return '|';      // pillar
     case 'archaeological_site': return '~';      // tilde
-    case 'theatre':             return '\u266A'; // ♪ music note
+    case 'theatre':             return '\u25B6'; // ▶ play triangle
     case 'library':             return '=';      // lines
     case 'viewpoint':           return '\u25CE'; // ◎ bullseye
     case 'attraction':          return '\u2605'; // ★ star
@@ -183,32 +180,16 @@ export async function renderStartup(): Promise<void> {
 export async function renderList(state: AppState): Promise<void> {
   const bridge = getBridge();
   const footerText = state.city || 'Scroll: browse  Tap: details';
+  const listText = formatLandmarkList(state.landmarks, state.selectedIndex);
 
   await bridge.rebuildPageContainer(new RebuildPageContainer({
     containerTotalNum: 4,
     textObject: [
       makeHeader('Nearby Landmarks'),
+      makeContent(listText),
       makeFooter(footerBoth(footerText, 'Wondereye')),
       makeEventCapture(),
     ],
-    imageObject: [
-      new ImageContainerProperty({
-        containerID: 2,
-        containerName: 'content',
-        xPosition: 0,
-        yPosition: HEADER_HEIGHT,
-        width: DISPLAY_WIDTH,
-        height: CONTENT_HEIGHT,
-      }),
-    ],
-  }));
-
-  const canvas = renderListToCanvas(state.landmarks, state.selectedIndex);
-  const png = await canvasToPng(canvas);
-  await bridge.updateImageRawData(new ImageRawDataUpdate({
-    containerID: 2,
-    containerName: 'content',
-    imageData: png,
   }));
 }
 
@@ -311,11 +292,12 @@ export async function renderError(message: string): Promise<void> {
 
 export async function updateListContent(state: AppState): Promise<void> {
   const bridge = getBridge();
-  const canvas = renderListToCanvas(state.landmarks, state.selectedIndex);
-  const png = await canvasToPng(canvas);
-  await bridge.updateImageRawData(new ImageRawDataUpdate({
+  const listText = formatLandmarkList(state.landmarks, state.selectedIndex);
+  await bridge.textContainerUpgrade(new TextContainerUpgrade({
     containerID: 2,
     containerName: 'content',
-    imageData: png,
+    contentOffset: 0,
+    contentLength: listText.length,
+    content: listText,
   }));
 }

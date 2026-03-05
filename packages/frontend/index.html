@@ -71,6 +71,49 @@
       text-decoration: none;
     }
     .support:hover { background: #f0ce00; }
+
+    /* Location setup panel (shown when ?uid= is in URL) */
+    .setup-panel {
+      margin-top: 2.5rem;
+      padding: 1.5rem;
+      border: 1px solid #222;
+      border-radius: 0.75rem;
+      text-align: left;
+    }
+    .setup-panel h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 0.5rem;
+    }
+    .setup-panel p {
+      font-size: 0.9rem;
+      color: #777;
+      line-height: 1.6;
+      margin-bottom: 1.25rem;
+    }
+    .locate-btn {
+      display: block;
+      width: 100%;
+      padding: 0.75rem 1rem;
+      background: #fff;
+      color: #000;
+      border: none;
+      border-radius: 0.5rem;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .locate-btn:disabled { opacity: 0.4; cursor: default; }
+    .locate-msg {
+      margin-top: 0.75rem;
+      font-size: 0.875rem;
+      color: #aaa;
+      text-align: center;
+      min-height: 1.4em;
+    }
+    .locate-msg.success { color: #4ade80; }
+    .locate-msg.error { color: #f87171; }
   </style>
 </head>
 <body>
@@ -85,6 +128,77 @@
       <p class="support-label">Support this project</p>
       <a class="support" href="https://buymeacoffee.com/cmdlabtech" target="_blank" rel="noopener">☕ Buy me a coffee</a>
     </div>
+
+    <div class="setup-panel" id="setup-panel" style="display:none">
+      <h2>Set Your Location</h2>
+      <p>Tap the button below to share your current location with Wondereye on your glasses.</p>
+      <button class="locate-btn" id="locate-btn">Use My Location</button>
+      <p class="locate-msg" id="locate-msg"></p>
+    </div>
   </div>
+
+  <script>
+    (function () {
+      const params = new URLSearchParams(window.location.search);
+      const uid = parseInt(params.get('uid') || '', 10);
+      if (!uid || uid <= 0) return;
+
+      document.getElementById('setup-panel').style.display = 'block';
+
+      const btn = document.getElementById('locate-btn');
+      const msg = document.getElementById('locate-msg');
+
+      // If not on a secure origin, redirect to production where HTTPS is available
+      var isSecure = window.location.protocol === 'https:' || window.location.hostname === 'localhost';
+      if (!isSecure) {
+        btn.textContent = 'Open on wondereye.app';
+        btn.addEventListener('click', function () {
+          window.location.href = 'https://wondereye.app/?uid=' + uid;
+        });
+        return;
+      }
+
+      btn.addEventListener('click', function () {
+        if (!navigator.geolocation) {
+          msg.textContent = 'Geolocation is not supported by this browser.';
+          msg.className = 'locate-msg error';
+          return;
+        }
+        btn.disabled = true;
+        msg.textContent = 'Getting location...';
+        msg.className = 'locate-msg';
+
+        navigator.geolocation.getCurrentPosition(
+          async function (pos) {
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            try {
+              const res = await fetch('https://api.wondereye.app/api/location', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ uid, lat, lng }),
+              });
+              if (res.ok) {
+                msg.textContent = 'Location saved! Restart Wondereye on your glasses.';
+                msg.className = 'locate-msg success';
+              } else {
+                throw new Error('API error ' + res.status);
+              }
+            } catch (e) {
+              msg.textContent = 'Failed to save location. Please try again.';
+              msg.className = 'locate-msg error';
+              btn.disabled = false;
+            }
+          },
+          function (err) {
+            msg.textContent = 'Could not get location: ' + err.message;
+            msg.className = 'locate-msg error';
+            btn.disabled = false;
+          },
+          { enableHighAccuracy: true, timeout: 10000 }
+        );
+      });
+    })();
+  </script>
 </body>
 </html>

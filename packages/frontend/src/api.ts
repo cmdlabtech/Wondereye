@@ -16,6 +16,16 @@ export async function fetchLandmarks(lat: number, lng: number): Promise<Landmark
   return data.landmarks;
 }
 
+export async function fetchUserLocation(uid: number): Promise<{ lat: number; lng: number } | null> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/location?uid=${uid}`);
+    if (!response.ok) return null;
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchLandmarkDetail(name: string): Promise<string> {
   const response = await fetch(`${API_BASE_URL}/api/landmark-detail`, {
     method: 'POST',

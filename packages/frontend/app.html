@@ -5,12 +5,172 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Wondereye</title>
   <style>
-    body { font-family: system-ui, sans-serif; padding: 2rem; background: #111; color: #0f0; }
-    #status { font-size: 1.2rem; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #000;
+      color: #fff;
+      font-family: 'Even Roster Grotesk', system-ui, -apple-system, sans-serif;
+      font-size: 20px;
+      font-weight: 400;
+      letter-spacing: 0;
+      padding: 24px 16px;
+      min-height: 100vh;
+    }
+
+    .app-name {
+      font-size: 20px;
+      font-weight: 400;
+      opacity: 0.6;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 32px;
+    }
+
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 16px;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 6px;
+      margin-bottom: 8px;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #444;
+      flex-shrink: 0;
+    }
+    .dot.active { background: #4ade80; }
+    .dot.loading { background: #facc15; }
+
+    .row-labels { flex: 1; }
+
+    .row-label {
+      font-size: 15px;
+      opacity: 0.45;
+      margin-bottom: 2px;
+    }
+
+    .row-value {
+      font-size: 20px;
+    }
+
+    .setup-section {
+      margin-top: 24px;
+      padding-top: 24px;
+      border-top: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .setup-label {
+      font-size: 15px;
+      opacity: 0.45;
+      margin-bottom: 10px;
+    }
+
+    .setup-url-box {
+      padding: 14px 16px;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 6px;
+      word-break: break-all;
+      font-size: 17px;
+      user-select: text;
+      -webkit-user-select: text;
+      cursor: text;
+    }
+
+    .copy-btn {
+      display: block;
+      width: 100%;
+      margin-top: 10px;
+      padding: 12px 16px;
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 6px;
+      font-size: 17px;
+      font-family: inherit;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      text-align: center;
+    }
+
+    .copy-btn:active {
+      background: rgba(255,255,255,0.18);
+    }
+
+    .setup-hint {
+      font-size: 14px;
+      opacity: 0.35;
+      margin-top: 10px;
+      line-height: 1.5;
+    }
   </style>
 </head>
 <body>
-  <div id="status">Loading...</div>
+  <div class="app-name">Wondereye</div>
+
+  <div class="status-row">
+    <div class="dot loading" id="connection-dot"></div>
+    <div class="row-labels">
+      <div class="row-label">Glasses</div>
+      <div class="row-value" id="connection-status">Connecting...</div>
+    </div>
+  </div>
+
+  <div class="status-row">
+    <div class="dot" id="location-dot"></div>
+    <div class="row-labels">
+      <div class="row-label">Location</div>
+      <div class="row-value" id="location-status">Waiting...</div>
+    </div>
+  </div>
+
+  <div class="setup-section" id="setup-section" style="display:none">
+    <div class="setup-label">Update location from your phone's browser</div>
+    <div class="setup-url-box" id="setup-url" onclick="selectUrl(this)"></div>
+    <button class="copy-btn" id="copy-btn" onclick="copyUrl()">Copy Link</button>
+    <p class="setup-hint">Long-press to select, or tap Copy &mdash; then open in Chrome or Safari</p>
+  </div>
+
+  <script>
+    var _setupUrl = '';
+
+    function selectUrl(el) {
+      var range = document.createRange();
+      range.selectNodeContents(el);
+      var sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+
+    function copyUrl() {
+      var btn = document.getElementById('copy-btn');
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(_setupUrl).then(function () {
+          btn.textContent = 'Copied!';
+          setTimeout(function () { btn.textContent = 'Copy Link'; }, 2000);
+        }).catch(function () { fallbackCopy(btn); });
+      } else {
+        fallbackCopy(btn);
+      }
+    }
+
+    function fallbackCopy(btn) {
+      selectUrl(document.getElementById('setup-url'));
+      try {
+        document.execCommand('copy');
+        btn.textContent = 'Copied!';
+        setTimeout(function () { btn.textContent = 'Copy Link'; }, 2000);
+      } catch (e) {
+        btn.textContent = 'Select text above to copy';
+      }
+    }
+  </script>
+
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>
