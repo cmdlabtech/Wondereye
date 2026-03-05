@@ -4,13 +4,24 @@ Discover nearby landmarks through your Even G2 smart glasses. Wondereye uses you
 
 ## Try It on Your Glasses
 
-Scan this QR code from the Even Hub app to load Wondereye instantly — no setup required.
+Scan this QR code from the Even Hub app to load Wondereye on your glasses.
 
 <p align="center">
   <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://wondereye.app/app.html" alt="Scan to open Wondereye on your Even G2" width="200" height="200" />
   <br/>
   <a href="https://wondereye.app/app.html">wondereye.app/app.html</a>
 </p>
+
+## Setting Your Location
+
+The Even G2 SDK (v0.0.7) does not expose a location API — calling any geolocation method inside the EvenHub WebView crashes the glasses at the native level. To work around this, Wondereye uses a two-step flow to share your phone's GPS with the glasses:
+
+1. **Open Wondereye on your glasses** via the QR code above. The phone screen (in the Even Hub app) will display a URL like `wondereye.app/?uid=XXXXXXXX` along with a **Copy Link** button.
+2. **Copy the link and open it in your phone's browser** (Safari or Chrome — not inside Even Hub). You'll see a "Set Your Location" panel.
+3. **Tap "Use My Location"**, allow the location prompt, and wait for the confirmation message.
+4. **Restart Wondereye** on your glasses (double-tap to return to the app list, then reopen it). It will now load landmarks for your current location.
+
+You only need to repeat this when your location changes significantly (e.g., traveling to a new city). Your location is stored server-side and linked to your Even account — it is not shared with anyone and is used solely to fetch nearby landmarks.
 
 ## Navigation
 
