@@ -21,7 +21,9 @@ The Even G2 SDK (v0.0.7) does not expose a location API — calling any geolocat
 3. **Tap "Use My Location"**, allow the location prompt, and wait for the confirmation message.
 4. **Restart Wondereye** on your glasses (double-tap to return to the app list, then reopen it). It will now load landmarks for your current location.
 
-You only need to repeat this when your location changes significantly (e.g., traveling to a new city). Your location is stored server-side and linked to your Even account — it is not shared with anyone and is used solely to fetch nearby landmarks.
+You only need to repeat this when your location changes significantly (e.g., traveling to a new city).
+
+**Privacy note:** Your location is stored server-side keyed to a one-way SHA-256 hash of your Even account ID — the raw ID is never written to storage. The database contains only anonymous hashes paired with approximate coordinates (~110m precision); no name, email, or other personal information is collected or stored anywhere in this system. Your location is used solely to fetch nearby landmarks and is not shared with anyone.
 
 ## Navigation
 

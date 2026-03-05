@@ -183,12 +183,19 @@ app.post('/api/landmark-detail', async (c) => {
   }
 });
 
+async function hashUid(uid: number): Promise<string> {
+  const data = new TextEncoder().encode(uid.toString());
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 app.get('/api/location', async (c) => {
   const uid = c.req.query('uid');
   if (!uid || !/^\d+$/.test(uid)) {
     return c.json({ error: 'uid is required' }, 400);
   }
-  const data = await c.env.LANDMARKS_CACHE.get(`user-location:${uid}`, 'json') as { lat: number; lng: number } | null;
+  const key = `user-location:${await hashUid(parseInt(uid, 10))}`;
+  const data = await c.env.LANDMARKS_CACHE.get(key, 'json') as { lat: number; lng: number } | null;
   if (!data) return c.json({ error: 'Not found' }, 404);
   return c.json(data);
 });
@@ -211,8 +218,9 @@ app.post('/api/location', async (c) => {
     return c.json({ error: 'Invalid coordinates' }, 400);
   }
 
+  const key = `user-location:${await hashUid(uid)}`;
   await c.env.LANDMARKS_CACHE.put(
-    `user-location:${uid}`,
+    key,
     JSON.stringify({ lat, lng }),
     { expirationTtl: 31536000 } // 1 year
   );
