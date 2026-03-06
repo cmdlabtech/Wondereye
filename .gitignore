@@ -4,6 +4,7 @@ dist/
 .env
 .env.*
 .wrangler/
+wrangler.jsonc
 *.ehpk
 .DS_Store
 .claude/
