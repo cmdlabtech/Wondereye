@@ -44,12 +44,10 @@ export async function queryOverpass(
     const elLng = element.lon ?? element.center?.lon;
     if (!elLat || !elLng) continue;
 
-    const type =
-      element.tags.tourism ||
-      element.tags.historic ||
-      element.tags.amenity ||
-      element.tags.building ||
-      'landmark';
+    // Prefer specific building types (cathedral, church, etc.) over generic tourism=attraction
+    const specificBuilding = ['cathedral', 'church', 'mosque', 'synagogue', 'temple'].includes(element.tags.building)
+      ? element.tags.building : null;
+    const type = specificBuilding || element.tags.amenity || element.tags.historic || element.tags.tourism || 'landmark';
 
     const distance = haversineDistance(lat, lng, elLat, elLng);
 

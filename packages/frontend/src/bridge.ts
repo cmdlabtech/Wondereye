@@ -15,7 +15,6 @@ export async function initBridge(): Promise<EvenAppBridge> {
     return EvenAppBridge.getInstance();
   });
 
-  console.log('[bridge] initialized:', !!bridgeInstance);
   return bridgeInstance;
 }
 

@@ -149,6 +149,7 @@ app.post('/api/landmark-detail', async (c) => {
       },
       body: JSON.stringify({
         model: 'grok-4-1-fast-non-reasoning',
+        max_tokens: 400,
         messages: [
           {
             role: 'system',

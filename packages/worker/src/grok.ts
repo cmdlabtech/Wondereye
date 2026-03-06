@@ -16,6 +16,7 @@ export async function generateSnippets(
     },
     body: JSON.stringify({
       model: 'grok-4-1-fast-non-reasoning',
+      max_tokens: 600,
       messages: [
         {
           role: 'system',

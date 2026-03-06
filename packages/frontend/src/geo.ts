@@ -13,7 +13,6 @@ export type LocationError =
  * coordinates in main.ts (Prague) until a safe location method is found.
  */
 export async function getCurrentPosition(): Promise<{ lat: number; lng: number }> {
-  console.warn('[geo] skipping all WebView location APIs (crash risk), using fallback');
   const err: LocationError = {
     code: 'unavailable',
     message: 'Location unavailable.',

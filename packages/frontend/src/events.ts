@@ -9,7 +9,6 @@ export function setupEventHandlers(
   onRefresh: () => void
 ): void {
   const bridge = getBridge();
-  let lastScrollTime = 0;
 
   bridge.onEvenHubEvent(async (event: any) => {
     let eventType: number | undefined =
@@ -23,16 +22,8 @@ export function setupEventHandlers(
 
     if (eventType == null) return;
 
-    const isScroll = eventType === OsEventTypeList.SCROLL_TOP_EVENT || eventType === OsEventTypeList.SCROLL_BOTTOM_EVENT;
-    if (isScroll) {
-      const now = Date.now();
-      if (now - lastScrollTime < 300) return;
-      lastScrollTime = now;
-    }
-
     try {
       if (eventType === OsEventTypeList.DOUBLE_CLICK_EVENT) {
-        // Double-tap always goes back to list from any view
         if (state.mode === 'reading') {
           state.mode = 'list';
           state.readingPage = undefined;
@@ -76,7 +67,6 @@ async function handleListEvent(eventType: number, state: AppState): Promise<void
 
     case OsEventTypeList.CLICK_EVENT: {
       const landmark = state.landmarks[state.selectedIndex];
-      // Show snippet only — tap within reading view triggers detail load
       state.mode = 'reading';
       state.detailLoaded = false;
       state.readingPages = paginateText(landmark.snippet);
@@ -94,7 +84,6 @@ async function handleReadingEvent(eventType: number, state: AppState): Promise<v
 
   switch (eventType) {
     case OsEventTypeList.CLICK_EVENT:
-      // Tap in reading view: load Grok details if not already loaded
       if (!state.detailLoaded) {
         state.detailLoaded = true;
         await renderReadingPage(landmark, pages[page], page, pages.length, true, true);
@@ -115,12 +104,12 @@ async function handleReadingEvent(eventType: number, state: AppState): Promise<v
       }
       break;
 
+    // Scroll directions match list: SCROLL_BOTTOM = backward, SCROLL_TOP = forward
     case OsEventTypeList.SCROLL_BOTTOM_EVENT:
       if (page > 0) {
         state.readingPage = page - 1;
         await renderReadingPage(landmark, pages[page - 1], page - 1, pages.length, false, !!state.detailLoaded);
       }
-      // At page 0: do nothing — only double-tap goes back
       break;
 
     case OsEventTypeList.SCROLL_TOP_EVENT:

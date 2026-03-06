@@ -2,12 +2,14 @@ import {
   CreateStartUpPageContainer,
   RebuildPageContainer,
   TextContainerProperty,
-  TextContainerUpgrade,
+  ImageContainerProperty,
+  ImageRawDataUpdate,
 } from '@evenrealities/even_hub_sdk';
 import { getBridge } from './bridge';
 import { AppState, Landmark } from './types';
 import { getUnits } from './units';
-import { DISPLAY_WIDTH, DISPLAY_HEIGHT, HEADER_HEIGHT, FOOTER_HEIGHT, VISIBLE_LANDMARKS } from './constants';
+import { DISPLAY_WIDTH, DISPLAY_HEIGHT, HEADER_HEIGHT, FOOTER_HEIGHT } from './constants';
+import { renderListToCanvas, canvasToPng, CONTENT_HEIGHT } from './canvas-list';
 
 const LIST_HEIGHT = DISPLAY_HEIGHT - HEADER_HEIGHT - FOOTER_HEIGHT;
 
@@ -64,24 +66,6 @@ function makeContent(text: string): TextContainerProperty {
   });
 }
 
-// Interactive content: outlined border per Even OS 2.0 spec (outline = tappable)
-function makeInteractiveContent(text: string): TextContainerProperty {
-  return new TextContainerProperty({
-    containerID: 2,
-    containerName: 'content',
-    xPosition: 0,
-    yPosition: HEADER_HEIGHT,
-    width: DISPLAY_WIDTH,
-    height: LIST_HEIGHT,
-    borderWidth: 1,
-    borderColor: 8,
-    borderRdaius: 6,
-    paddingLength: 4,
-    content: text,
-    isEventCapture: 0,
-  });
-}
-
 function makeFooter(text: string): TextContainerProperty {
   return new TextContainerProperty({
     containerID: 3,
@@ -127,43 +111,6 @@ function truncate(text: string, maxLen: number): string {
   return text.length <= maxLen ? text : text.slice(0, maxLen - 3) + '...';
 }
 
-function landmarkSymbol(type: string): string {
-  switch (type) {
-    case 'castle':              return '\u25B2'; // ▲ triangle (turret)
-    case 'cathedral':
-    case 'church':
-    case 'place_of_worship':
-    case 'mosque':
-    case 'temple':              return '+';      // cross
-    case 'synagogue':           return '\u2605'; // ★ star
-    case 'museum':              return '\u25A0'; // ■ square (building)
-    case 'gallery':
-    case 'artwork':             return '\u25C8'; // ◈ diamond+square
-    case 'monument':
-    case 'memorial':            return '|';      // pillar
-    case 'archaeological_site': return '~';      // tilde
-    case 'theatre':             return '\u25B6'; // ▶ play triangle
-    case 'library':             return '=';      // lines
-    case 'viewpoint':           return '\u25CE'; // ◎ bullseye
-    case 'attraction':          return '\u2605'; // ★ star
-    default:                    return '\u25C6'; // ◆ diamond
-  }
-}
-
-export function formatLandmarkList(landmarks: Landmark[], selectedIndex: number): string {
-  const lines: string[] = [];
-  const start = Math.max(0, selectedIndex - (VISIBLE_LANDMARKS - 1));
-  const end = Math.min(landmarks.length, start + VISIBLE_LANDMARKS);
-
-  for (let i = start; i < end; i++) {
-    const lm = landmarks[i];
-    const pointer = i === selectedIndex ? '\u25B6' : ' ';
-    lines.push(`${pointer} ${landmarkSymbol(lm.type)} ${truncate(lm.name, 43)}`);
-  }
-
-  return lines.join('\n');
-}
-
 export async function renderStartup(): Promise<void> {
   const bridge = getBridge();
   await bridge.createStartUpPageContainer(new CreateStartUpPageContainer({
@@ -180,30 +127,32 @@ export async function renderStartup(): Promise<void> {
 export async function renderList(state: AppState): Promise<void> {
   const bridge = getBridge();
   const footerText = state.city || 'Scroll: browse  Tap: details';
-  const listText = formatLandmarkList(state.landmarks, state.selectedIndex);
 
   await bridge.rebuildPageContainer(new RebuildPageContainer({
     containerTotalNum: 4,
     textObject: [
       makeHeader('Nearby Landmarks'),
-      makeContent(listText),
       makeFooter(footerBoth(footerText, 'Wondereye')),
       makeEventCapture(),
     ],
-  }));
-}
-
-export async function renderDetail(landmark: Landmark): Promise<void> {
-  const bridge = getBridge();
-
-  await bridge.rebuildPageContainer(new RebuildPageContainer({
-    containerTotalNum: 4,
-    textObject: [
-      makeDetailHeader(landmark.name, landmark.distance),
-      makeInteractiveContent(landmark.snippet),
-      makeFooter(footerBoth('\u2193 Read more  Tap: back', 'Wondereye')),
-      makeEventCapture(),
+    imageObject: [
+      new ImageContainerProperty({
+        containerID: 2,
+        containerName: 'content',
+        xPosition: 0,
+        yPosition: HEADER_HEIGHT,
+        width: DISPLAY_WIDTH,
+        height: CONTENT_HEIGHT,
+      }),
     ],
+  }));
+
+  const canvas = renderListToCanvas(state.landmarks, state.selectedIndex);
+  const png = await canvasToPng(canvas);
+  await bridge.updateImageRawData(new ImageRawDataUpdate({
+    containerID: 2,
+    containerName: 'content',
+    imageData: png,
   }));
 }
 
@@ -248,35 +197,6 @@ export async function renderReadingPage(landmark: Landmark, page: string, _pageN
   }));
 }
 
-let loadingTimer: ReturnType<typeof setInterval> | null = null;
-
-export async function renderLoading(): Promise<void> {
-  const bridge = getBridge();
-  let dots = 0;
-
-  const update = async () => {
-    dots = (dots + 1) % 4;
-    const text = 'Gathering details' + '.'.repeat(dots).padEnd(3, ' ');
-    await bridge.textContainerUpgrade(new TextContainerUpgrade({
-      containerID: 2,
-      containerName: 'content',
-      contentOffset: 0,
-      contentLength: text.length,
-      content: text,
-    }));
-  };
-
-  await update();
-  loadingTimer = setInterval(update, 400);
-}
-
-export function stopLoading(): void {
-  if (loadingTimer !== null) {
-    clearInterval(loadingTimer);
-    loadingTimer = null;
-  }
-}
-
 export async function renderError(message: string): Promise<void> {
   const bridge = getBridge();
   await bridge.rebuildPageContainer(new RebuildPageContainer({
@@ -292,12 +212,11 @@ export async function renderError(message: string): Promise<void> {
 
 export async function updateListContent(state: AppState): Promise<void> {
   const bridge = getBridge();
-  const listText = formatLandmarkList(state.landmarks, state.selectedIndex);
-  await bridge.textContainerUpgrade(new TextContainerUpgrade({
+  const canvas = renderListToCanvas(state.landmarks, state.selectedIndex);
+  const png = await canvasToPng(canvas);
+  await bridge.updateImageRawData(new ImageRawDataUpdate({
     containerID: 2,
     containerName: 'content',
-    contentOffset: 0,
-    contentLength: listText.length,
-    content: listText,
+    imageData: png,
   }));
 }

@@ -8,7 +8,7 @@ export const FOOTER_HEIGHT = 30;
 export const LIST_HEIGHT = DISPLAY_HEIGHT - HEADER_HEIGHT - FOOTER_HEIGHT; // 218px
 
 // API
-const devHost = import.meta.env.VITE_DEV_IP || '192.168.86.100';
+const devHost = import.meta.env.VITE_DEV_IP || 'localhost';
 export const API_BASE_URL = import.meta.env.DEV
   ? `http://${devHost}:8787`
   : 'https://api.wondereye.app';

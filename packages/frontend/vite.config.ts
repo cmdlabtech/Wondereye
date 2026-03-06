@@ -2,8 +2,9 @@ import { defineConfig, loadEnv } from 'vite';
 import { resolve } from 'path';
 
 // Load .env.local for dev IP configuration
+// process.env.VITE_DEV_IP takes precedence (allows script overrides), then .env.local, then localhost
 const env = loadEnv('development', process.cwd());
-const devHost = env.VITE_DEV_IP || '192.168.86.100';
+const devHost = process.env.VITE_DEV_IP || env.VITE_DEV_IP || 'localhost';
 
 export default defineConfig({
   root: '.',

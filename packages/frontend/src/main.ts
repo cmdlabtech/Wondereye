@@ -52,18 +52,13 @@ async function getLocation(): Promise<{ lat: number; lng: number }> {
   const paramLng = parseFloat(params.get('lng') || '');
   if (Number.isFinite(paramLat) && Number.isFinite(paramLng)
       && paramLat >= -90 && paramLat <= 90 && paramLng >= -180 && paramLng <= 180) {
-    console.log('[geo] using URL params');
     return { lat: paramLat, lng: paramLng };
   }
 
   // Try location stored via the homepage (uid-based)
   if (state.uid) {
     const stored = await fetchUserLocation(state.uid);
-    if (stored) {
-      console.log('[geo] using stored location for uid', state.uid);
-      return stored;
-    }
-    console.log('[geo] no stored location for uid', state.uid);
+    if (stored) return stored;
   }
 
   try {
@@ -78,20 +73,15 @@ async function getLocation(): Promise<{ lat: number; lng: number }> {
 async function loadLandmarks(): Promise<void> {
   try {
     state.mode = 'loading';
-    console.log('[app] renderStartup');
     await renderStartup();
 
-    console.log('[app] getting location');
     setPhoneLocationStatus('Getting location...');
     const { lat, lng } = await getLocation();
-    console.log('[app] location acquired');
 
-    console.log('[app] fetching landmarks');
     const [landmarks, city] = await Promise.all([
       fetchLandmarks(lat, lng),
       reverseGeocode(lat, lng),
     ]);
-    console.log('[app] got landmarks:', landmarks.length, 'city:', city);
 
     setPhoneLocationStatus(city || `${lat.toFixed(3)}, ${lng.toFixed(3)}`, true);
 
@@ -129,14 +119,10 @@ async function loadLandmarks(): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  console.log('[app] starting');
-
   try {
     setPhoneStatus('Connecting...');
     setPhoneDot('connection-dot', 'loading');
-    console.log('[app] waiting for bridge');
     await initBridge();
-    console.log('[app] bridge ready');
 
     setPhoneStatus('Connected');
     setPhoneDot('connection-dot', 'active');
@@ -147,7 +133,6 @@ async function main(): Promise<void> {
       if (user?.uid) {
         state.uid = user.uid;
         showPhoneSetupLink(user.uid);
-        console.log('[app] uid:', user.uid);
       }
     } catch (e) {
       console.warn('[app] getUserInfo failed:', e);
