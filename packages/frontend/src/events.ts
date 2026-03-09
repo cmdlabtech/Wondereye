@@ -30,7 +30,7 @@ export function setupEventHandlers(
           state.readingPages = undefined;
           state.detailLoaded = undefined;
           await renderList(state);
-        } else {
+        } else if (state.mode !== 'loading') {
           onRefresh();
         }
         return;

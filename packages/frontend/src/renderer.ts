@@ -124,13 +124,13 @@ export async function renderStartup(): Promise<void> {
   }));
 }
 
-export async function renderLoading(): Promise<void> {
+export async function renderLoading(message = 'Finding nearby landmarks...'): Promise<void> {
   const bridge = getBridge();
   await bridge.rebuildPageContainer(new RebuildPageContainer({
     containerTotalNum: 4,
     textObject: [
       makeHeader('Wondereye'),
-      makeContent('Finding nearby landmarks...'),
+      makeContent(message),
       makeFooter(footerBoth('Please wait', 'Wondereye')),
       makeEventCapture(),
     ],

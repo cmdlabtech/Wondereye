@@ -73,7 +73,7 @@ async function getLocation(): Promise<{ lat: number; lng: number }> {
 async function loadLandmarks(): Promise<void> {
   try {
     state.mode = 'loading';
-    await renderStartup();
+    await renderLoading('Getting your location...');
 
     setPhoneLocationStatus('Getting location...');
     const { lat, lng } = await getLocation();
@@ -128,6 +128,9 @@ async function main(): Promise<void> {
 
     setPhoneStatus('Connected');
     setPhoneDot('connection-dot', 'active');
+
+    // Initialize glasses display exactly once (SDK requires createStartUpPageContainer called once)
+    await renderStartup();
 
     // Get Even user uid for location persistence
     try {
