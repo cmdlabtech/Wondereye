@@ -1,5 +1,12 @@
 var _setupUrl = '';
 
+document.addEventListener('DOMContentLoaded', function () {
+  var copyBtn = document.getElementById('copy-btn');
+  var setupUrl = document.getElementById('setup-url');
+  if (copyBtn) copyBtn.addEventListener('click', copyUrl);
+  if (setupUrl) setupUrl.addEventListener('click', function () { selectUrl(this); });
+});
+
 function selectUrl(el) {
   var range = document.createRange();
   range.selectNodeContents(el);

@@ -124,6 +124,19 @@ export async function renderStartup(): Promise<void> {
   }));
 }
 
+export async function renderLoading(): Promise<void> {
+  const bridge = getBridge();
+  await bridge.rebuildPageContainer(new RebuildPageContainer({
+    containerTotalNum: 4,
+    textObject: [
+      makeHeader('Wondereye'),
+      makeContent('Finding nearby landmarks...'),
+      makeFooter(footerBoth('Please wait', 'Wondereye')),
+      makeEventCapture(),
+    ],
+  }));
+}
+
 export async function renderList(state: AppState): Promise<void> {
   const bridge = getBridge();
   const footerText = state.city || 'Scroll: browse  Tap: details';

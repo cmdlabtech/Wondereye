@@ -50,7 +50,17 @@
         });
       },
       function (err) {
-        msg.textContent = 'Could not get location: ' + err.message;
+        var text;
+        if (err.code === 1) {
+          text = 'Location access was blocked. Open your browser settings, allow location for this site, then try again.';
+        } else if (err.code === 2) {
+          text = 'Could not determine your location. Please try again.';
+        } else if (err.code === 3) {
+          text = 'Location request timed out. Please try again.';
+        } else {
+          text = 'Could not get location: ' + err.message;
+        }
+        msg.textContent = text;
         msg.className = 'locate-msg error';
         btn.disabled = false;
       },

@@ -2,7 +2,7 @@ import { initBridge } from './bridge';
 import { getBridge } from './bridge';
 import { getCurrentPosition, LocationError } from './geo';
 import { fetchLandmarks, fetchUserLocation } from './api';
-import { renderStartup, renderList, renderError } from './renderer';
+import { renderStartup, renderLoading, renderList, renderError } from './renderer';
 import { setupEventHandlers } from './events';
 import { AppState } from './types';
 import { reverseGeocode } from './geocode';
@@ -77,6 +77,8 @@ async function loadLandmarks(): Promise<void> {
 
     setPhoneLocationStatus('Getting location...');
     const { lat, lng } = await getLocation();
+
+    await renderLoading();
 
     const [landmarks, city] = await Promise.all([
       fetchLandmarks(lat, lng),
