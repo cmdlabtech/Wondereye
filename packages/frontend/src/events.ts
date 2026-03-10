@@ -11,21 +11,27 @@ export function setupEventHandlers(
   const bridge = getBridge();
 
   bridge.onEvenHubEvent(async (event: any) => {
-    // System events (foreground/background, disconnect, etc.) — ignore them.
-    // The SDK may send periodic sysEvents while idle; treating them as taps
-    // causes repeated renders that crash the glasses.
+    // Ignore lifecycle system events (foreground/background), not user input.
+    // The SDK sends periodic sysEvents (enter/exit) while idle; filtering only
+    // these specific types prevents idle crashes while allowing tap/scroll sysEvents through.
     if (event.sysEvent && !event.textEvent && !event.listEvent) {
-      console.log('[events] sysEvent ignored:', event.sysEvent?.eventType);
-      return;
+      const sysEventType = event.sysEvent?.eventType;
+      if (sysEventType === OsEventTypeList.FOREGROUND_ENTER_EVENT ||
+          sysEventType === OsEventTypeList.FOREGROUND_EXIT_EVENT ||
+          sysEventType === OsEventTypeList.ABNORMAL_EXIT_EVENT) {
+        console.log('[events] lifecycle sysEvent ignored:', sysEventType);
+        return;
+      }
+      // Otherwise, process as user input (tap/scroll may come as sysEvent)
     }
 
     let eventType: number | undefined =
       event.textEvent?.eventType ??
-      event.listEvent?.eventType;
+      event.listEvent?.eventType ??
+      event.sysEvent?.eventType;
 
     // SDK bug: CLICK_EVENT (0) gets normalized to undefined by fromJson.
-    // Only apply this fallback for user input events (text/list), not sysEvent.
-    if (eventType == null && (event.textEvent || event.listEvent)) {
+    if (eventType == null && (event.textEvent || event.listEvent || event.sysEvent)) {
       eventType = OsEventTypeList.CLICK_EVENT;
     }
 
