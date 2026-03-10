@@ -18,6 +18,45 @@
     return;
   }
 
+  function saveLocation(lat, lng) {
+    fetch('https://api.wondereye.app/api/location', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid: uid, lat: lat, lng: lng }),
+    }).then(function (res) {
+      if (res.ok) {
+        msg.textContent = 'Location saved! Restart Wondereye on your glasses.';
+        msg.className = 'locate-msg success';
+      } else {
+        throw new Error('API error ' + res.status);
+      }
+    }).catch(function () {
+      msg.textContent = 'Failed to save location. Please try again.';
+      msg.className = 'locate-msg error';
+      btn.disabled = false;
+    });
+  }
+
+  function onSuccess(pos) {
+    saveLocation(pos.coords.latitude, pos.coords.longitude);
+  }
+
+  function showGeoError(err) {
+    var text;
+    if (err.code === 1) {
+      text = 'Location access was blocked. Open your browser settings, allow location for this site, then try again.';
+    } else if (err.code === 2) {
+      text = 'Could not determine your location. Please try again.';
+    } else if (err.code === 3) {
+      text = 'Location request timed out. Please try again.';
+    } else {
+      text = 'Could not get location: ' + err.message;
+    }
+    msg.textContent = text;
+    msg.className = 'locate-msg error';
+    btn.disabled = false;
+  }
+
   btn.addEventListener('click', function () {
     if (!navigator.geolocation) {
       msg.textContent = 'Geolocation is not supported by this browser.';
@@ -28,43 +67,18 @@
     msg.textContent = 'Getting location...';
     msg.className = 'locate-msg';
 
+    // Try GPS first (longer timeout for iOS Safari which needs more time),
+    // fall back to Wi-Fi/cell positioning if GPS fails.
     navigator.geolocation.getCurrentPosition(
-      function (pos) {
-        var lat = pos.coords.latitude;
-        var lng = pos.coords.longitude;
-        fetch('https://api.wondereye.app/api/location', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ uid: uid, lat: lat, lng: lng }),
-        }).then(function (res) {
-          if (res.ok) {
-            msg.textContent = 'Location saved! Restart Wondereye on your glasses.';
-            msg.className = 'locate-msg success';
-          } else {
-            throw new Error('API error ' + res.status);
-          }
-        }).catch(function () {
-          msg.textContent = 'Failed to save location. Please try again.';
-          msg.className = 'locate-msg error';
-          btn.disabled = false;
+      onSuccess,
+      function () {
+        navigator.geolocation.getCurrentPosition(onSuccess, showGeoError, {
+          enableHighAccuracy: false,
+          timeout: 15000,
+          maximumAge: 60000,
         });
       },
-      function (err) {
-        var text;
-        if (err.code === 1) {
-          text = 'Location access was blocked. Open your browser settings, allow location for this site, then try again.';
-        } else if (err.code === 2) {
-          text = 'Could not determine your location. Please try again.';
-        } else if (err.code === 3) {
-          text = 'Location request timed out. Please try again.';
-        } else {
-          text = 'Could not get location: ' + err.message;
-        }
-        msg.textContent = text;
-        msg.className = 'locate-msg error';
-        btn.disabled = false;
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 60000 }
     );
   });
 })();
