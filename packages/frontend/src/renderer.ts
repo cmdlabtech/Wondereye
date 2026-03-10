@@ -140,6 +140,8 @@ export async function renderLoading(message = 'Finding nearby landmarks...'): Pr
 export async function renderList(state: AppState): Promise<void> {
   const bridge = getBridge();
   const footerText = state.city || 'Scroll: browse  Tap: details';
+  // Center the 100px image vertically in the 218px content area
+  const imageY = HEADER_HEIGHT + Math.round((LIST_HEIGHT - CONTENT_HEIGHT) / 2);
 
   await bridge.rebuildPageContainer(new RebuildPageContainer({
     containerTotalNum: 4,
@@ -153,7 +155,7 @@ export async function renderList(state: AppState): Promise<void> {
         containerID: 2,
         containerName: 'content',
         xPosition: 0,
-        yPosition: HEADER_HEIGHT,
+        yPosition: imageY,
         width: DISPLAY_WIDTH,
         height: CONTENT_HEIGHT,
       }),
