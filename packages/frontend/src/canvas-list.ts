@@ -1,16 +1,14 @@
 import { Landmark } from './types';
 import { DISPLAY_WIDTH, HEADER_HEIGHT, FOOTER_HEIGHT, VISIBLE_LANDMARKS } from './constants';
 
-// SDK ImageContainerProperty hard limit: height 20-100px.
-// Exceeding 100px causes delayed firmware crash on idle.
-export const CONTENT_HEIGHT = 100;
-const ROW_H = Math.floor(CONTENT_HEIGHT / VISIBLE_LANDMARKS); // 20px
-const ICON_SIZE = 14;
-const ICON_PAD = 4;
-const TEXT_X = ICON_PAD + ICON_SIZE + 6;
-const BORDER_MARGIN = 1;
-const FONT_SIZE = 13;
-const SELECTION_RADIUS = 4;
+export const CONTENT_HEIGHT = DISPLAY_WIDTH === 576 ? 218 : (288 - HEADER_HEIGHT - FOOTER_HEIGHT);
+const ROW_H = Math.floor(CONTENT_HEIGHT / VISIBLE_LANDMARKS); // ~43px
+const ICON_SIZE = 20;
+const ICON_PAD = 8;
+const TEXT_X = ICON_PAD + ICON_SIZE + 8;
+const BORDER_MARGIN = 2;
+const FONT_SIZE = 19;
+const SELECTION_RADIUS = 6;
 
 // --- Icon drawing functions ---
 

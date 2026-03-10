@@ -73,12 +73,13 @@ async function getLocation(): Promise<{ lat: number; lng: number }> {
 async function loadLandmarks(): Promise<void> {
   try {
     state.mode = 'loading';
-    await renderLoading('Getting your location...');
+    // Only rebuild if this is a refresh (not initial load — startup page already showing)
+    if (state.landmarks.length > 0) {
+      await renderLoading();
+    }
 
     setPhoneLocationStatus('Getting location...');
     const { lat, lng } = await getLocation();
-
-    await renderLoading();
 
     const [landmarks, city] = await Promise.all([
       fetchLandmarks(lat, lng),
