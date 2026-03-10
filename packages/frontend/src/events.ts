@@ -11,12 +11,21 @@ export function setupEventHandlers(
   const bridge = getBridge();
 
   bridge.onEvenHubEvent(async (event: any) => {
+    // System events (foreground/background, disconnect, etc.) — ignore them.
+    // The SDK may send periodic sysEvents while idle; treating them as taps
+    // causes repeated renders that crash the glasses.
+    if (event.sysEvent && !event.textEvent && !event.listEvent) {
+      console.log('[events] sysEvent ignored:', event.sysEvent?.eventType);
+      return;
+    }
+
     let eventType: number | undefined =
       event.textEvent?.eventType ??
-      event.listEvent?.eventType ??
-      event.sysEvent?.eventType;
+      event.listEvent?.eventType;
 
-    if (eventType == null && (event.sysEvent || event.textEvent || event.listEvent)) {
+    // SDK bug: CLICK_EVENT (0) gets normalized to undefined by fromJson.
+    // Only apply this fallback for user input events (text/list), not sysEvent.
+    if (eventType == null && (event.textEvent || event.listEvent)) {
       eventType = OsEventTypeList.CLICK_EVENT;
     }
 
