@@ -2,14 +2,12 @@ import {
   CreateStartUpPageContainer,
   RebuildPageContainer,
   TextContainerProperty,
-  ImageContainerProperty,
-  ImageRawDataUpdate,
+  TextContainerUpgrade,
 } from '@evenrealities/even_hub_sdk';
 import { getBridge } from './bridge';
 import { AppState, Landmark } from './types';
 import { getUnits } from './units';
-import { DISPLAY_WIDTH, DISPLAY_HEIGHT, HEADER_HEIGHT, FOOTER_HEIGHT } from './constants';
-import { renderListToCanvas, canvasToPng, IMAGE_WIDTH, IMAGE_HEIGHT } from './canvas-list';
+import { DISPLAY_WIDTH, DISPLAY_HEIGHT, HEADER_HEIGHT, FOOTER_HEIGHT, VISIBLE_LANDMARKS } from './constants';
 
 const LIST_HEIGHT = DISPLAY_HEIGHT - HEADER_HEIGHT - FOOTER_HEIGHT;
 
@@ -137,35 +135,38 @@ export async function renderLoading(message = 'Finding nearby landmarks...'): Pr
   }));
 }
 
+// ~55 chars per line in the content area (576px - padding, at ~6.2px/char)
+const LIST_COLS = 55;
+
+function formatListText(landmarks: Landmark[], selectedIndex: number): string {
+  const start = Math.max(0, selectedIndex - (VISIBLE_LANDMARKS - 1));
+  const end = Math.min(landmarks.length, start + VISIBLE_LANDMARKS);
+
+  const lines: string[] = [];
+  for (let i = start; i < end; i++) {
+    const prefix = i === selectedIndex ? '> ' : '  ';
+    const dist = formatDistance(landmarks[i].distance);
+    const maxName = LIST_COLS - prefix.length - dist.length - 1;
+    const name = truncate(landmarks[i].name, maxName);
+    const pad = ' '.repeat(Math.max(1, LIST_COLS - prefix.length - name.length - dist.length));
+    lines.push(prefix + name + pad + dist);
+  }
+  return lines.join('\n');
+}
+
 export async function renderList(state: AppState): Promise<void> {
   const bridge = getBridge();
   const footerText = state.city || 'Scroll: browse  Tap: details';
+  const listText = formatListText(state.landmarks, state.selectedIndex);
 
   await bridge.rebuildPageContainer(new RebuildPageContainer({
     containerTotalNum: 4,
     textObject: [
       makeHeader('Nearby Landmarks'),
+      makeContent(listText),
       makeFooter(footerBoth(footerText, 'Wondereye')),
       makeEventCapture(),
     ],
-    imageObject: [
-      new ImageContainerProperty({
-        containerID: 2,
-        containerName: 'content',
-        xPosition: 0,
-        yPosition: HEADER_HEIGHT,
-        width: IMAGE_WIDTH,
-        height: IMAGE_HEIGHT,
-      }),
-    ],
-  }));
-
-  const canvas = renderListToCanvas(state.landmarks, state.selectedIndex);
-  const png = await canvasToPng(canvas);
-  await bridge.updateImageRawData(new ImageRawDataUpdate({
-    containerID: 2,
-    containerName: 'content',
-    imageData: png,
   }));
 }
 
@@ -225,11 +226,12 @@ export async function renderError(message: string): Promise<void> {
 
 export async function updateListContent(state: AppState): Promise<void> {
   const bridge = getBridge();
-  const canvas = renderListToCanvas(state.landmarks, state.selectedIndex);
-  const png = await canvasToPng(canvas);
-  await bridge.updateImageRawData(new ImageRawDataUpdate({
+  const listText = formatListText(state.landmarks, state.selectedIndex);
+  await bridge.textContainerUpgrade(new TextContainerUpgrade({
     containerID: 2,
     containerName: 'content',
-    imageData: png,
+    contentOffset: 0,
+    contentLength: listText.length,
+    content: listText,
   }));
 }
