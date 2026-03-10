@@ -9,7 +9,7 @@ import { getBridge } from './bridge';
 import { AppState, Landmark } from './types';
 import { getUnits } from './units';
 import { DISPLAY_WIDTH, DISPLAY_HEIGHT, HEADER_HEIGHT, FOOTER_HEIGHT } from './constants';
-import { renderListToCanvas, canvasToPng, CONTENT_HEIGHT } from './canvas-list';
+import { renderListToCanvas, canvasToPng, IMAGE_WIDTH, IMAGE_HEIGHT } from './canvas-list';
 
 const LIST_HEIGHT = DISPLAY_HEIGHT - HEADER_HEIGHT - FOOTER_HEIGHT;
 
@@ -154,8 +154,8 @@ export async function renderList(state: AppState): Promise<void> {
         containerName: 'content',
         xPosition: 0,
         yPosition: HEADER_HEIGHT,
-        width: DISPLAY_WIDTH,
-        height: CONTENT_HEIGHT,
+        width: IMAGE_WIDTH,
+        height: IMAGE_HEIGHT,
       }),
     ],
   }));

@@ -1,14 +1,18 @@
 import { Landmark } from './types';
-import { DISPLAY_WIDTH, HEADER_HEIGHT, FOOTER_HEIGHT, VISIBLE_LANDMARKS } from './constants';
+import { DISPLAY_WIDTH } from './constants';
 
-export const CONTENT_HEIGHT = DISPLAY_WIDTH === 576 ? 218 : (288 - HEADER_HEIGHT - FOOTER_HEIGHT);
-const ROW_H = Math.floor(CONTENT_HEIGHT / VISIBLE_LANDMARKS); // ~43px
-const ICON_SIZE = 20;
-const ICON_PAD = 8;
-const TEXT_X = ICON_PAD + ICON_SIZE + 8;
-const BORDER_MARGIN = 2;
-const FONT_SIZE = 19;
-const SELECTION_RADIUS = 6;
+// SDK ImageContainerProperty hard limit: height 20-100px (exceeding crashes firmware).
+// Width can use full display width (576px).
+export const IMAGE_WIDTH = DISPLAY_WIDTH;
+export const IMAGE_HEIGHT = 100;
+const VISIBLE_ROWS = 4; // 4 rows × 25px = 100px
+const ROW_H = Math.floor(IMAGE_HEIGHT / VISIBLE_ROWS); // 25px
+const ICON_SIZE = 16;
+const ICON_PAD = 5;
+const TEXT_X = ICON_PAD + ICON_SIZE + 6;
+const BORDER_MARGIN = 1;
+const FONT_SIZE = 18;
+const SELECTION_RADIUS = 4;
 
 // --- Icon drawing functions ---
 
@@ -158,15 +162,15 @@ function truncateToWidth(ctx: CanvasRenderingContext2D, text: string, maxW: numb
 
 export function renderListToCanvas(landmarks: Landmark[], selectedIndex: number): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
-  canvas.width = DISPLAY_WIDTH;
-  canvas.height = CONTENT_HEIGHT;
+  canvas.width = IMAGE_WIDTH;
+  canvas.height = IMAGE_HEIGHT;
   const ctx = canvas.getContext('2d')!;
 
   ctx.fillStyle = '#000000';
-  ctx.fillRect(0, 0, DISPLAY_WIDTH, CONTENT_HEIGHT);
+  ctx.fillRect(0, 0, IMAGE_WIDTH, IMAGE_HEIGHT);
 
-  const start = Math.max(0, selectedIndex - (VISIBLE_LANDMARKS - 1));
-  const end = Math.min(landmarks.length, start + VISIBLE_LANDMARKS);
+  const start = Math.max(0, selectedIndex - (VISIBLE_ROWS - 1));
+  const end = Math.min(landmarks.length, start + VISIBLE_ROWS);
 
   for (let i = start; i < end; i++) {
     const rowIndex = i - start;
@@ -184,7 +188,7 @@ export function renderListToCanvas(landmarks: Landmark[], selectedIndex: number)
       ctx.roundRect(
         BORDER_MARGIN,
         rowY + BORDER_MARGIN,
-        DISPLAY_WIDTH - BORDER_MARGIN * 2,
+        IMAGE_WIDTH - BORDER_MARGIN * 2,
         ROW_H - BORDER_MARGIN * 2,
         SELECTION_RADIUS,
       );
@@ -198,7 +202,7 @@ export function renderListToCanvas(landmarks: Landmark[], selectedIndex: number)
 
     ctx.font = `${FONT_SIZE}px monospace`;
     ctx.fillStyle = fg;
-    const maxW = DISPLAY_WIDTH - TEXT_X - 8;
+    const maxW = IMAGE_WIDTH - TEXT_X - 8;
     ctx.fillText(truncateToWidth(ctx, landmarks[i].name, maxW), TEXT_X, textY);
   }
 
