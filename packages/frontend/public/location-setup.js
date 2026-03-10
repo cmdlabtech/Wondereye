@@ -41,10 +41,16 @@
     saveLocation(pos.coords.latitude, pos.coords.longitude);
   }
 
+  var isIOS = /iP(hone|ad|od)/.test(navigator.userAgent);
+
   function showGeoError(err) {
     var text;
     if (err.code === 1) {
-      text = 'Location access was blocked. Open your browser settings, allow location for this site, then try again.';
+      if (isIOS) {
+        text = 'Location access was blocked. On iPhone, go to Settings \u2192 Privacy & Security \u2192 Location Services \u2192 Safari and set it to "While Using". Also make sure Location Services is turned on at the top of that screen. If you\u2019re in Private Browsing, switch to a regular tab.';
+      } else {
+        text = 'Location access was blocked. Open your browser settings, allow location for this site, then try again.';
+      }
     } else if (err.code === 2) {
       text = 'Could not determine your location. Please try again.';
     } else if (err.code === 3) {
