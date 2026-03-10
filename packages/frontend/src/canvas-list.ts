@@ -1,18 +1,17 @@
 import { Landmark } from './types';
-import { DISPLAY_WIDTH } from './constants';
 
-// SDK ImageContainerProperty hard limit: height 20-100px (exceeding crashes firmware).
-// Width can use full display width (576px).
-export const IMAGE_WIDTH = DISPLAY_WIDTH;
+// SDK ImageContainerProperty hard limits: width 20-200px, height 20-100px.
+// Both confirmed to crash the glasses firmware when exceeded.
+export const IMAGE_WIDTH = 200;
 export const IMAGE_HEIGHT = 100;
-const VISIBLE_ROWS = 4; // 4 rows × 25px = 100px
-const ROW_H = Math.floor(IMAGE_HEIGHT / VISIBLE_ROWS); // 25px
-const ICON_SIZE = 16;
-const ICON_PAD = 5;
-const TEXT_X = ICON_PAD + ICON_SIZE + 6;
+const VISIBLE_ROWS = 5; // 5 rows × 20px = 100px
+const ROW_H = Math.floor(IMAGE_HEIGHT / VISIBLE_ROWS); // 20px
+const ICON_SIZE = 14;
+const ICON_PAD = 4;
+const TEXT_X = ICON_PAD + ICON_SIZE + 4;
 const BORDER_MARGIN = 1;
-const FONT_SIZE = 18;
-const SELECTION_RADIUS = 4;
+const FONT_SIZE = 13;
+const SELECTION_RADIUS = 3;
 
 // --- Icon drawing functions ---
 
