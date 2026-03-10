@@ -2,7 +2,6 @@ import {
   CreateStartUpPageContainer,
   RebuildPageContainer,
   TextContainerProperty,
-  TextContainerUpgrade,
 } from '@evenrealities/even_hub_sdk';
 import { getBridge } from './bridge';
 import { AppState, Landmark } from './types';
@@ -225,13 +224,5 @@ export async function renderError(message: string): Promise<void> {
 }
 
 export async function updateListContent(state: AppState): Promise<void> {
-  const bridge = getBridge();
-  const listText = formatListText(state.landmarks, state.selectedIndex);
-  await bridge.textContainerUpgrade(new TextContainerUpgrade({
-    containerID: 2,
-    containerName: 'content',
-    contentOffset: 0,
-    contentLength: listText.length,
-    content: listText,
-  }));
+  await renderList(state);
 }
