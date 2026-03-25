@@ -8,6 +8,7 @@ wrangler.jsonc
 *.ehpk
 .DS_Store
 .claude/
+memory/
 CLAUDE.md
 # IDE
 .vscode/
@@ -16,3 +17,7 @@ CLAUDE.md
 test.html
 *test.ts
 *test.js
+
+# Screenshots
+Screenshots/
+glasses_*.png
