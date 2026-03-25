@@ -4,7 +4,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "deploy": "npm run build && wrangler deploy"
+    "deploy": "npm run build && wrangler deploy",
+    "pack": "npm run build && evenhub pack app.json dist -o wondereye.ehpk"
   },
   "dependencies": {
     "@evenrealities/even_hub_sdk": "latest",
@@ -14,6 +15,7 @@
     "leaflet.markercluster": "^1.5.3"
   },
   "devDependencies": {
+    "@evenrealities/evenhub-cli": "^0.1.11",
     "@types/leaflet": "^1.9.21",
     "@types/node": "^25.3.3",
     "typescript": "^5.5.0",
