@@ -6,12 +6,19 @@ import { Bindings, LandmarkResponse } from './types';
 
 const MAX_RADIUS = 2000;
 const MIN_RADIUS = 50;
-const CACHE_TTL = 604800; // 7 days — landmark history doesn't change
-const DETAIL_CACHE_TTL = 604800; // 7 days — landmark history doesn't change
+const CACHE_TTL = 7776000; // 90 days
+const DETAIL_CACHE_TTL = 7776000; // 90 days
+const PLACE_TTL = 7776000; // 90 days — accumulates for the map
+const MAP_CACHE_TTL = 3600; // 1 hour — aggregated /api/map response
 
 function cacheKey(lat: number, lng: number, radius: number): string {
   return `landmarks:${lat.toFixed(3)}:${lng.toFixed(3)}:${radius}`;
 }
+
+function placeKey(name: string): string {
+  return `place:${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 100)}`;
+}
+
 const RATE_LIMIT_WINDOW = 60_000; // 1 minute
 const RATE_LIMIT_MAX = 10; // requests per window per IP
 
@@ -88,31 +95,69 @@ app.post('/api/landmarks', async (c) => {
 
   const cached = await c.env.LANDMARKS_CACHE.get(key, 'json');
   if (cached) {
-    return c.json(cached as LandmarkResponse);
+    const response = cached as LandmarkResponse;
+    // Backfill place: entries for old cached data that lacks coordinates
+    if (response.landmarks.length > 0 && response.landmarks[0].lat == null) {
+      c.executionCtx.waitUntil(
+        (async () => {
+          const existing = await Promise.all(
+            response.landmarks.map(lm => c.env.LANDMARKS_CACHE.get(placeKey(lm.name)))
+          );
+          const missing = response.landmarks.filter((_, i) => existing[i] === null);
+          if (missing.length === 0) return;
+          const pois = await queryOverpass(safeLat, safeLng, radius);
+          await Promise.all(
+            missing.map(lm => {
+              const poi = pois.find(p => p.name.toLowerCase() === lm.name.toLowerCase());
+              if (!poi) return Promise.resolve();
+              return c.env.LANDMARKS_CACHE.put(
+                placeKey(lm.name),
+                JSON.stringify({ name: lm.name, type: lm.type, lat: poi.lat, lng: poi.lng, snippet: lm.snippet }),
+                { expirationTtl: PLACE_TTL }
+              );
+            })
+          );
+        })().catch(() => {})
+      );
+    }
+    return c.json(response);
+  }
+
+  let pois;
+  try {
+    pois = await queryOverpass(safeLat, safeLng, radius);
+  } catch (err) {
+    console.error('[api] Overpass error:', err);
+    return c.json({ error: 'Failed to fetch nearby places. Please try again.' }, 502);
+  }
+
+  if (pois.length === 0) {
+    // Do not cache empty results — could be a transient Overpass issue
+    return c.json({ landmarks: [] });
   }
 
   try {
-    const pois = await queryOverpass(safeLat, safeLng, radius);
-
-    if (pois.length === 0) {
-      const emptyResponse: LandmarkResponse = { landmarks: [] };
-      await c.env.LANDMARKS_CACHE.put(key, JSON.stringify(emptyResponse), {
-        expirationTtl: CACHE_TTL,
-      });
-      return c.json(emptyResponse);
-    }
-
     const landmarks = await generateSnippets(pois, c.env.XAI_API_KEY);
     const response: LandmarkResponse = { landmarks };
+    if (landmarks.length === 0) {
+      return c.json(response);
+    }
     c.executionCtx.waitUntil(
-      c.env.LANDMARKS_CACHE.put(key, JSON.stringify(response), {
-        expirationTtl: CACHE_TTL,
-      })
+      Promise.all([
+        c.env.LANDMARKS_CACHE.put(key, JSON.stringify(response), { expirationTtl: CACHE_TTL }),
+        ...landmarks.map(lm =>
+          c.env.LANDMARKS_CACHE.put(
+            placeKey(lm.name),
+            JSON.stringify({ name: lm.name, type: lm.type, lat: lm.lat, lng: lm.lng, snippet: lm.snippet }),
+            { expirationTtl: PLACE_TTL }
+          )
+        ),
+      ])
     );
     return c.json(response);
   } catch (err) {
-    console.error('[api] landmarks error:', err);
-    return c.json({ error: 'Failed to fetch landmarks. Please try again.' }, 502);
+    console.error('[api] Grok error:', err);
+    return c.json({ error: 'Failed to generate landmark info. Please try again.' }, 502);
   }
 });
 
@@ -226,6 +271,29 @@ app.post('/api/location', async (c) => {
     { expirationTtl: 31536000 } // 1 year
   );
   return c.json({ ok: true });
+});
+
+app.get('/api/map', async (c) => {
+  const cached = await c.env.LANDMARKS_CACHE.get('map-cache', 'json');
+  if (cached) return c.json(cached);
+
+  const list = await c.env.LANDMARKS_CACHE.list({ prefix: 'place:' });
+  const entries = await Promise.all(
+    list.keys.map(k => c.env.LANDMARKS_CACHE.get(k.name, 'json'))
+  );
+  const seen = new Set<string>();
+  const landmarks = entries.filter((e: any) => {
+    if (!e || !e.name) return false;
+    const key = e.name.toLowerCase().trim();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  const response = { landmarks };
+  c.executionCtx.waitUntil(
+    c.env.LANDMARKS_CACHE.put('map-cache', JSON.stringify(response), { expirationTtl: MAP_CACHE_TTL })
+  );
+  return c.json(response);
 });
 
 app.get('/health', (c) => c.json({ status: 'ok' }));

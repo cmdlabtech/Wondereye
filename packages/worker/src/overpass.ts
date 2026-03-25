@@ -9,21 +9,44 @@ export async function queryOverpass(
     [out:json][timeout:25];
     (
       nwr["name"]["tourism"~"museum|attraction|viewpoint|artwork|gallery"](around:${radius},${lat},${lng});
-      nwr["name"]["historic"~"monument|memorial|castle|archaeological_site|building"](around:${radius},${lat},${lng});
+      nwr["name"]["historic"~"monument|memorial|castle|archaeological_site"](around:${radius},${lat},${lng});
       nwr["name"]["amenity"~"place_of_worship|theatre|library"](around:${radius},${lat},${lng});
       nwr["name"]["building"~"cathedral|church|mosque|synagogue|temple"](around:${radius},${lat},${lng});
     );
     out center body qt;
   `;
 
-  const response = await fetch('https://overpass-api.de/api/interpreter', {
-    method: 'POST',
-    body: `data=${encodeURIComponent(query)}`,
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-  });
+  const endpoints = [
+    'https://overpass-api.de/api/interpreter',
+    'https://overpass.private.coffee/api/interpreter',
+    'https://overpass.osm.ch/api/interpreter',
+  ];
 
-  if (!response.ok) {
-    throw new Error(`Overpass API error: ${response.status}`);
+  const ENDPOINT_TIMEOUT_MS = 10_000;
+
+  let response: Response | undefined;
+  for (const endpoint of endpoints) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), ENDPOINT_TIMEOUT_MS);
+    try {
+      response = await fetch(endpoint, {
+        method: 'POST',
+        body: `data=${encodeURIComponent(query)}`,
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        signal: controller.signal,
+      });
+    } catch {
+      console.warn(`[overpass] ${endpoint} failed, trying next...`);
+      continue;
+    } finally {
+      clearTimeout(timer);
+    }
+    if (response.ok) break;
+    console.warn(`[overpass] ${endpoint} returned ${response.status}, trying next...`);
+  }
+
+  if (!response || !response.ok) {
+    throw new Error(`Overpass API error: ${response?.status ?? 'no response'}`);
   }
 
   const data: any = await response.json();

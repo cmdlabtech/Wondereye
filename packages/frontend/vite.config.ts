@@ -21,6 +21,7 @@ export default defineConfig({
         main: resolve(__dirname, 'index.html'),
         app: resolve(__dirname, 'app.html'),
         settings: resolve(__dirname, 'settings.html'),
+        map: resolve(__dirname, 'map.html'),
       },
     },
   },

@@ -36,7 +36,8 @@ ${nameList}`,
   });
 
   if (!response.ok) {
-    throw new Error(`Grok API error: ${response.status}`);
+    const body = await response.text().catch(() => '');
+    throw new Error(`Grok API error: ${response.status} — ${body.slice(0, 200)}`);
   }
 
   const result: any = await response.json();
@@ -65,7 +66,9 @@ ${nameList}`,
         name: poi.name,
         type: poi.type,
         distance: poi.distance,
-        snippet: s.snippet,
+        lat: poi.lat,
+        lng: poi.lng,
+        snippet: s.snippet.replace(/\s*\(\d+\s*chars?\)\.?/gi, '').trim(),
       };
     })
     .filter((l): l is Landmark => l !== null)
