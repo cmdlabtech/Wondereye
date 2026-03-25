@@ -4,9 +4,12 @@ import { AppState } from './types';
 import { renderList, renderReadingPage, updateListContent, paginateText } from './renderer';
 import { fetchLandmarkDetail } from './api';
 
+const IMU_DATA_REPORT = 8; // OsEventTypeList.IMU_DATA_REPORT added in SDK 0.0.9
+
 export function setupEventHandlers(
   state: AppState,
-  onRefresh: () => void
+  onRefresh: () => void,
+  onIMUEvent?: (event: any) => void
 ): void {
   const bridge = getBridge();
 
@@ -20,6 +23,10 @@ export function setupEventHandlers(
           sysEventType === OsEventTypeList.FOREGROUND_EXIT_EVENT ||
           sysEventType === OsEventTypeList.ABNORMAL_EXIT_EVENT) {
         console.log('[events] lifecycle sysEvent ignored:', sysEventType);
+        return;
+      }
+      if (sysEventType === IMU_DATA_REPORT) {
+        onIMUEvent?.(event);
         return;
       }
       // Otherwise, process as user input (tap/scroll may come as sysEvent)
@@ -64,18 +71,30 @@ export function setupEventHandlers(
   });
 }
 
+export async function triggerClick(state: AppState, onRefresh: () => void): Promise<void> {
+  try {
+    switch (state.mode) {
+      case 'list':    await handleListEvent(OsEventTypeList.CLICK_EVENT, state); break;
+      case 'reading': await handleReadingEvent(OsEventTypeList.CLICK_EVENT, state); break;
+      case 'error':   onRefresh(); break;
+    }
+  } catch (err) {
+    console.error('[events] triggerClick error:', err);
+  }
+}
+
 async function handleListEvent(eventType: number, state: AppState): Promise<void> {
   switch (eventType) {
     case OsEventTypeList.SCROLL_BOTTOM_EVENT:
-      if (state.selectedIndex > 0) {
-        state.selectedIndex--;
+      if (state.selectedIndex < state.landmarks.length - 1) {
+        state.selectedIndex++;
         await updateListContent(state);
       }
       break;
 
     case OsEventTypeList.SCROLL_TOP_EVENT:
-      if (state.selectedIndex < state.landmarks.length - 1) {
-        state.selectedIndex++;
+      if (state.selectedIndex > 0) {
+        state.selectedIndex--;
         await updateListContent(state);
       }
       break;
@@ -119,18 +138,18 @@ async function handleReadingEvent(eventType: number, state: AppState): Promise<v
       }
       break;
 
-    // Scroll directions match list: SCROLL_BOTTOM = backward, SCROLL_TOP = forward
+    // Swipe back (SCROLL_BOTTOM) = previous page, swipe forward (SCROLL_TOP) = next page
     case OsEventTypeList.SCROLL_BOTTOM_EVENT:
-      if (page > 0) {
-        state.readingPage = page - 1;
-        await renderReadingPage(landmark, pages[page - 1], page - 1, pages.length, false, !!state.detailLoaded);
+      if (page < pages.length - 1) {
+        state.readingPage = page + 1;
+        await renderReadingPage(landmark, pages[page + 1], page + 1, pages.length, false, !!state.detailLoaded);
       }
       break;
 
     case OsEventTypeList.SCROLL_TOP_EVENT:
-      if (page < pages.length - 1) {
-        state.readingPage = page + 1;
-        await renderReadingPage(landmark, pages[page + 1], page + 1, pages.length, false, !!state.detailLoaded);
+      if (page > 0) {
+        state.readingPage = page - 1;
+        await renderReadingPage(landmark, pages[page - 1], page - 1, pages.length, false, !!state.detailLoaded);
       }
       break;
   }

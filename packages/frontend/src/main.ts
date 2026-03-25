@@ -3,7 +3,8 @@ import { getBridge } from './bridge';
 import { getCurrentPosition, LocationError } from './geo';
 import { fetchLandmarks, fetchUserLocation } from './api';
 import { renderStartup, renderLoading, renderList, renderError } from './renderer';
-import { setupEventHandlers } from './events';
+import { setupEventHandlers, triggerClick } from './events';
+import { initIMU } from './imu';
 import { AppState } from './types';
 import { reverseGeocode } from './geocode';
 
@@ -144,7 +145,13 @@ async function main(): Promise<void> {
       console.warn('[app] getUserInfo failed:', e);
     }
 
-    setupEventHandlers(state, loadLandmarks);
+    let imuHandler: ((event: any) => void) | undefined;
+    try {
+      imuHandler = initIMU(getBridge(), () => triggerClick(state, loadLandmarks));
+    } catch (err) {
+      console.warn('[app] IMU not available:', err);
+    }
+    setupEventHandlers(state, loadLandmarks, imuHandler);
     await loadLandmarks();
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Unknown error';
