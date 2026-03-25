@@ -101,29 +101,49 @@ app.post('/api/landmarks', async (c) => {
   const cached = await c.env.LANDMARKS_CACHE.get(key, 'json');
   if (cached) {
     const response = cached as LandmarkResponse;
-    // Backfill place: entries for old cached data that lacks coordinates
-    if (response.landmarks.length > 0 && response.landmarks[0].lat == null) {
-      c.executionCtx.waitUntil(
-        (async () => {
-          const existing = await Promise.all(
-            response.landmarks.map(lm => c.env.LANDMARKS_CACHE.get(placeKey(lm.name)))
-          );
-          const missing = response.landmarks.filter((_, i) => existing[i] === null);
-          if (missing.length === 0) return;
-          const pois = await queryOverpass(safeLat, safeLng, radius);
-          await Promise.all(
-            missing.flatMap(lm => {
-              const poi = pois.find(p => p.name.toLowerCase() === lm.name.toLowerCase());
-              if (!poi) return [];
-              const entry = JSON.stringify({ name: lm.name, type: lm.type, lat: poi.lat, lng: poi.lng, snippet: lm.snippet });
-              return [
-                c.env.LANDMARKS_CACHE.put(placeKey(lm.name), entry, { expirationTtl: PLACE_TTL }),
-                c.env.LANDMARKS_CACHE.put(mapPlaceKey(lm.name), entry), // no TTL — permanent
-              ];
-            })
-          );
-        })().catch(() => {})
-      );
+    if (response.landmarks.length > 0) {
+      if (response.landmarks[0].lat == null) {
+        // Old cached data without coordinates — backfill via Overpass
+        c.executionCtx.waitUntil(
+          (async () => {
+            const existing = await Promise.all(
+              response.landmarks.map(lm => c.env.LANDMARKS_CACHE.get(placeKey(lm.name)))
+            );
+            const missing = response.landmarks.filter((_, i) => existing[i] === null);
+            if (missing.length === 0) return;
+            const pois = await queryOverpass(safeLat, safeLng, radius);
+            await Promise.all([
+              ...missing.flatMap(lm => {
+                const poi = pois.find(p => p.name.toLowerCase() === lm.name.toLowerCase());
+                if (!poi) return [];
+                const entry = JSON.stringify({ name: lm.name, type: lm.type, lat: poi.lat, lng: poi.lng, snippet: lm.snippet });
+                return [
+                  c.env.LANDMARKS_CACHE.put(placeKey(lm.name), entry, { expirationTtl: PLACE_TTL }),
+                  c.env.LANDMARKS_CACHE.put(mapPlaceKey(lm.name), entry),
+                ];
+              }),
+              c.env.LANDMARKS_CACHE.delete('map-cache'),
+            ]);
+          })().catch(() => {})
+        );
+      } else {
+        // Cached data has coordinates — backfill mapplace: if missing (one read as proxy for all)
+        c.executionCtx.waitUntil(
+          (async () => {
+            const exists = await c.env.LANDMARKS_CACHE.get(mapPlaceKey(response.landmarks[0].name));
+            if (exists) return;
+            await Promise.all([
+              ...response.landmarks.map(lm =>
+                c.env.LANDMARKS_CACHE.put(
+                  mapPlaceKey(lm.name),
+                  JSON.stringify({ name: lm.name, type: lm.type, lat: lm.lat, lng: lm.lng, snippet: lm.snippet })
+                )
+              ),
+              c.env.LANDMARKS_CACHE.delete('map-cache'),
+            ]);
+          })().catch(() => {})
+        );
+      }
     }
     return c.json(response);
   }
@@ -150,6 +170,7 @@ app.post('/api/landmarks', async (c) => {
     c.executionCtx.waitUntil(
       Promise.all([
         c.env.LANDMARKS_CACHE.put(key, JSON.stringify(response), { expirationTtl: CACHE_TTL }),
+        c.env.LANDMARKS_CACHE.delete('map-cache'),
         ...landmarks.flatMap(lm => {
           const entry = JSON.stringify({ name: lm.name, type: lm.type, lat: lm.lat, lng: lm.lng, snippet: lm.snippet });
           return [
