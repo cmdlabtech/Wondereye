@@ -1,5 +1,7 @@
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import 'leaflet.markercluster';
+import 'leaflet.markercluster/dist/MarkerCluster.css';
 import { API_BASE_URL } from './constants';
 
 interface MapLandmark {
@@ -29,25 +31,40 @@ async function init() {
     const countEl = document.getElementById('count');
     if (countEl) countEl.textContent = `${landmarks.length} landmark${landmarks.length !== 1 ? 's' : ''}`;
 
+    const clusters = L.markerClusterGroup({
+      maxClusterRadius: 60,
+      showCoverageOnHover: false,
+      iconCreateFunction: (cluster) => {
+        const count = cluster.getChildCount();
+        const size = count < 10 ? 32 : count < 100 ? 40 : 48;
+        return L.divIcon({
+          html: `<div class="wmap-cluster">${count}</div>`,
+          className: '',
+          iconSize: L.point(size, size),
+        });
+      },
+    });
+
     for (const lm of landmarks) {
-      L.circleMarker([lm.lat, lm.lng], {
-        radius: 6,
-        color: '#fff',
-        weight: 1,
+      const marker = L.circleMarker([lm.lat, lm.lng], {
+        radius: 5,
+        color: '#4ade80',
+        weight: 1.5,
         fillColor: '#4ade80',
-        fillOpacity: 0.85,
-      })
-        .addTo(map)
-        .bindPopup(
-          `<strong style="font-size:0.9rem">${lm.name}</strong>` +
-          `<br><span style="font-size:0.75rem;color:#888;text-transform:uppercase;letter-spacing:0.04em">${lm.type}</span>` +
-          `<br><br><span style="font-size:0.85rem">${lm.snippet}</span>`
-        );
+        fillOpacity: 0.9,
+      }).bindPopup(
+        `<strong>${lm.name}</strong>` +
+        `<br><span class="popup-type">${lm.type}</span>` +
+        `<br><br>${lm.snippet}`
+      );
+      clusters.addLayer(marker);
     }
+
+    map.addLayer(clusters);
 
     if (landmarks.length > 0) {
       const bounds = L.latLngBounds(landmarks.map(lm => [lm.lat, lm.lng] as [number, number]));
-      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 12 });
+      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 10 });
     }
   } catch (e) {
     console.error('[map] Failed to load landmark data:', e);

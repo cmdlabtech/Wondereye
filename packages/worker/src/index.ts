@@ -8,7 +8,7 @@ const MAX_RADIUS = 2000;
 const MIN_RADIUS = 50;
 const CACHE_TTL = 7776000; // 90 days
 const DETAIL_CACHE_TTL = 7776000; // 90 days
-const PLACE_TTL = 7776000; // 90 days — accumulates for the map
+const PLACE_TTL = 7776000; // 90 days — short-term accumulator
 const MAP_CACHE_TTL = 3600; // 1 hour — aggregated /api/map response
 
 function cacheKey(lat: number, lng: number, radius: number): string {
@@ -17,6 +17,11 @@ function cacheKey(lat: number, lng: number, radius: number): string {
 
 function placeKey(name: string): string {
   return `place:${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 100)}`;
+}
+
+// Permanent map record — no TTL, survives 90-day cache resets
+function mapPlaceKey(name: string): string {
+  return `mapplace:${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 100)}`;
 }
 
 const RATE_LIMIT_WINDOW = 60_000; // 1 minute
@@ -107,14 +112,14 @@ app.post('/api/landmarks', async (c) => {
           if (missing.length === 0) return;
           const pois = await queryOverpass(safeLat, safeLng, radius);
           await Promise.all(
-            missing.map(lm => {
+            missing.flatMap(lm => {
               const poi = pois.find(p => p.name.toLowerCase() === lm.name.toLowerCase());
-              if (!poi) return Promise.resolve();
-              return c.env.LANDMARKS_CACHE.put(
-                placeKey(lm.name),
-                JSON.stringify({ name: lm.name, type: lm.type, lat: poi.lat, lng: poi.lng, snippet: lm.snippet }),
-                { expirationTtl: PLACE_TTL }
-              );
+              if (!poi) return [];
+              const entry = JSON.stringify({ name: lm.name, type: lm.type, lat: poi.lat, lng: poi.lng, snippet: lm.snippet });
+              return [
+                c.env.LANDMARKS_CACHE.put(placeKey(lm.name), entry, { expirationTtl: PLACE_TTL }),
+                c.env.LANDMARKS_CACHE.put(mapPlaceKey(lm.name), entry), // no TTL — permanent
+              ];
             })
           );
         })().catch(() => {})
@@ -145,13 +150,13 @@ app.post('/api/landmarks', async (c) => {
     c.executionCtx.waitUntil(
       Promise.all([
         c.env.LANDMARKS_CACHE.put(key, JSON.stringify(response), { expirationTtl: CACHE_TTL }),
-        ...landmarks.map(lm =>
-          c.env.LANDMARKS_CACHE.put(
-            placeKey(lm.name),
-            JSON.stringify({ name: lm.name, type: lm.type, lat: lm.lat, lng: lm.lng, snippet: lm.snippet }),
-            { expirationTtl: PLACE_TTL }
-          )
-        ),
+        ...landmarks.flatMap(lm => {
+          const entry = JSON.stringify({ name: lm.name, type: lm.type, lat: lm.lat, lng: lm.lng, snippet: lm.snippet });
+          return [
+            c.env.LANDMARKS_CACHE.put(placeKey(lm.name), entry, { expirationTtl: PLACE_TTL }),
+            c.env.LANDMARKS_CACHE.put(mapPlaceKey(lm.name), entry), // no TTL — permanent
+          ];
+        }),
       ])
     );
     return c.json(response);
@@ -277,10 +282,16 @@ app.get('/api/map', async (c) => {
   const cached = await c.env.LANDMARKS_CACHE.get('map-cache', 'json');
   if (cached) return c.json(cached);
 
-  const list = await c.env.LANDMARKS_CACHE.list({ prefix: 'place:' });
-  const entries = await Promise.all(
-    list.keys.map(k => c.env.LANDMARKS_CACHE.get(k.name, 'json'))
-  );
+  // Paginate through all mapplace: entries (KV list returns max 1000 per call)
+  const keys: string[] = [];
+  let cursor: string | undefined;
+  do {
+    const page: any = await c.env.LANDMARKS_CACHE.list({ prefix: 'mapplace:', cursor, limit: 1000 });
+    keys.push(...page.keys.map((k: any) => k.name));
+    cursor = page.list_complete ? undefined : page.cursor;
+  } while (cursor);
+
+  const entries = await Promise.all(keys.map(k => c.env.LANDMARKS_CACHE.get(k, 'json')));
   const seen = new Set<string>();
   const landmarks = entries.filter((e: any) => {
     if (!e || !e.name) return false;
