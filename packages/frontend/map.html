@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Wondereye — Landmark Map</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     body {
       font-family: system-ui, -apple-system, sans-serif;
       background: #111;
@@ -13,12 +13,16 @@
       display: flex;
       flex-direction: column;
       height: 100vh;
+      height: 100dvh;
     }
     header {
       display: flex;
       align-items: center;
       gap: 1rem;
-      padding: 0.75rem 1.25rem;
+      padding-top: max(0.75rem, env(safe-area-inset-top));
+      padding-bottom: 0.75rem;
+      padding-left: max(1.25rem, env(safe-area-inset-left));
+      padding-right: max(1.25rem, env(safe-area-inset-right));
       border-bottom: 1px solid #222;
       flex-shrink: 0;
     }
@@ -26,6 +30,9 @@
       font-size: 0.85rem;
       color: #555;
       text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      min-height: 44px;
     }
     header a:hover { color: #aaa; }
     header h1 {
@@ -40,6 +47,7 @@
     }
     #map {
       flex: 1;
+      padding-bottom: env(safe-area-inset-bottom);
     }
     /* Cluster icons */
     .wmap-cluster {
@@ -64,15 +72,37 @@
       border-radius: 6px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.5);
       font-size: 0.85rem;
-      max-width: 240px;
+      max-width: min(280px, calc(100vw - 40px));
     }
     .leaflet-popup-tip { background: #1a1a1a; }
-    .leaflet-popup-close-button { color: #666 !important; }
+    .leaflet-popup-close-button {
+      color: #666 !important;
+      width: 44px !important;
+      height: 44px !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      font-size: 1.25rem !important;
+    }
     .popup-type {
       font-size: 0.7rem;
       color: #555;
       text-transform: uppercase;
       letter-spacing: 0.06em;
+    }
+    /* Landmark marker: visible dot with large transparent touch area */
+    .wmap-marker {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .wmap-marker-dot {
+      width: 10px;
+      height: 10px;
+      background: #4ade80;
+      border-radius: 50%;
+      border: 1.5px solid rgba(255,255,255,0.6);
+      box-shadow: 0 0 4px rgba(74,222,128,0.5);
     }
   </style>
 </head>
