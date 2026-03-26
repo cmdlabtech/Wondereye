@@ -13,7 +13,8 @@ interface MapLandmark {
 }
 
 async function init() {
-  const map = L.map('map').setView([30, 10], 2);
+  const map = L.map('map', { zoomControl: false }).setView([30, 10], 2);
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
 
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
     attribution:
@@ -45,14 +46,17 @@ async function init() {
       },
     });
 
+    // 44×44 transparent hit area with a centred 10px visual dot for easy mobile tapping
+    const markerIcon = L.divIcon({
+      html: '<div class="wmap-marker"><div class="wmap-marker-dot"></div></div>',
+      className: '',
+      iconSize: L.point(44, 44),
+      iconAnchor: L.point(22, 22),
+      popupAnchor: L.point(0, -22),
+    });
+
     for (const lm of landmarks) {
-      const marker = L.circleMarker([lm.lat, lm.lng], {
-        radius: 5,
-        color: '#4ade80',
-        weight: 1.5,
-        fillColor: '#4ade80',
-        fillOpacity: 0.9,
-      }).bindPopup(
+      const marker = L.marker([lm.lat, lm.lng], { icon: markerIcon }).bindPopup(
         `<strong>${lm.name}</strong>` +
         `<br><span class="popup-type">${lm.type}</span>` +
         `<br><br>${lm.snippet}`
