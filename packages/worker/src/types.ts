@@ -29,4 +29,5 @@ export type Bindings = {
   XAI_API_KEY: string;
   ALLOWED_ORIGIN?: string;
   LANDMARKS_CACHE: KVNamespace;
+  DEV?: string;
 };

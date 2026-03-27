@@ -65,8 +65,9 @@ app.use('/*', async (c, next) => {
 });
 
 app.post('/api/landmarks', async (c) => {
-  const ip = c.req.header('cf-connecting-ip') || 'unknown';
-  if (!checkRateLimit(ip)) {
+  const ip = c.req.header('cf-connecting-ip');
+  if (!ip && c.env.DEV !== 'true') return c.json({ error: 'Too many requests. Try again shortly.' }, 429);
+  if (ip && !checkRateLimit(ip)) {
     return c.json({ error: 'Too many requests. Try again shortly.' }, 429);
   }
 
@@ -188,8 +189,9 @@ app.post('/api/landmarks', async (c) => {
 });
 
 app.post('/api/landmark-detail', async (c) => {
-  const ip = c.req.header('cf-connecting-ip') || 'unknown';
-  if (!checkRateLimit(ip)) {
+  const ip = c.req.header('cf-connecting-ip');
+  if (!ip && c.env.DEV !== 'true') return c.json({ error: 'Too many requests. Try again shortly.' }, 429);
+  if (ip && !checkRateLimit(ip)) {
     return c.json({ error: 'Too many requests. Try again shortly.' }, 429);
   }
 
@@ -211,6 +213,8 @@ app.post('/api/landmark-detail', async (c) => {
     return c.json(cachedDetail);
   }
 
+  const safeName = name.replace(/["\\]/g, ' ').replace(/[\r\n]/g, ' ').trim();
+
   try {
     const res = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
@@ -228,7 +232,7 @@ app.post('/api/landmark-detail', async (c) => {
           },
           {
             role: 'user',
-            content: `Using Grokipedia, give a concise background on the landmark "${name}". Include what it is, its history, why it's notable, and one interesting fact. Keep it under 800 characters.`,
+            content: `Using Grokipedia, give a concise background on the landmark "${safeName}". Include what it is, its history, why it's notable, and one interesting fact. Keep it under 800 characters.`,
           },
         ],
       }),
@@ -273,6 +277,12 @@ app.get('/api/location', async (c) => {
 });
 
 app.post('/api/location', async (c) => {
+  const origin = c.req.header('origin');
+  const allowedOrigins = (c.env.ALLOWED_ORIGIN || '').split(',').map((o) => o.trim());
+  if (!origin || !allowedOrigins.includes(origin)) {
+    return c.json({ error: 'Forbidden' }, 403);
+  }
+
   let body: any;
   try {
     body = await c.req.json();

@@ -49,6 +49,7 @@
       flex: 1;
       padding-bottom: env(safe-area-inset-bottom);
     }
+    .leaflet-container { background: #111; }
     /* Cluster icons */
     .wmap-cluster {
       width: 100%;
@@ -103,6 +104,19 @@
       border-radius: 50%;
       border: 1.5px solid rgba(255,255,255,0.6);
       box-shadow: 0 0 4px rgba(74,222,128,0.5);
+    }
+    /* Cluster landmark list */
+    .cl-list { display: flex; flex-direction: column; gap: 2px; }
+    .cl-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 6px 4px; cursor: pointer; border-bottom: 1px solid #2a2a2a;
+      font-size: 0.82rem;
+    }
+    .cl-item:last-child { border-bottom: none; }
+    .cl-item:hover { background: #252525; border-radius: 4px; }
+    .cl-type {
+      font-size: 0.68rem; color: #555; text-transform: uppercase;
+      letter-spacing: 0.05em; margin-left: 8px; flex-shrink: 0;
     }
   </style>
 </head>

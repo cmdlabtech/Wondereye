@@ -12,8 +12,19 @@ interface MapLandmark {
   snippet: string;
 }
 
+function escHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 async function init() {
-  const map = L.map('map', { zoomControl: false }).setView([30, 10], 2);
+  const map = L.map('map', {
+    zoomControl: false,
+    minZoom: 2,
+    maxZoom: 14,
+    zoomSnap: 0.25,
+    zoomDelta: 0.5,
+    wheelPxPerZoomLevel: 120,
+  }).setView([20, 0], 2);
   L.control.zoom({ position: 'bottomright' }).addTo(map);
 
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
@@ -35,6 +46,7 @@ async function init() {
     const clusters = L.markerClusterGroup({
       maxClusterRadius: 60,
       showCoverageOnHover: false,
+      zoomToBoundsOnClick: false,
       iconCreateFunction: (cluster) => {
         const count = cluster.getChildCount();
         const size = count < 10 ? 32 : count < 100 ? 40 : 48;
@@ -56,20 +68,63 @@ async function init() {
     });
 
     for (const lm of landmarks) {
-      const marker = L.marker([lm.lat, lm.lng], { icon: markerIcon }).bindPopup(
-        `<strong>${lm.name}</strong>` +
-        `<br><span class="popup-type">${lm.type}</span>` +
-        `<br><br>${lm.snippet}`
-      );
+      const marker = L.marker([lm.lat, lm.lng], { icon: markerIcon });
+      (marker as any)._lm = lm;
+      marker.on('click', () => {
+        L.popup({ maxWidth: 260 })
+          .setLatLng(marker.getLatLng())
+          .setContent(
+            `<strong>${escHtml(lm.name)}</strong>` +
+            `<br><span class="popup-type">${escHtml(lm.type)}</span>` +
+            `<br><br>${escHtml(lm.snippet)}`
+          )
+          .openOn(map);
+      });
       clusters.addLayer(marker);
     }
 
     map.addLayer(clusters);
 
-    if (landmarks.length > 0) {
-      const bounds = L.latLngBounds(landmarks.map(lm => [lm.lat, lm.lng] as [number, number]));
-      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 10 });
-    }
+    let popupOpenedAtZoom: number | null = null;
+    map.on('popupopen', () => { popupOpenedAtZoom = map.getZoom(); });
+    map.on('popupclose', () => { popupOpenedAtZoom = null; });
+    map.on('zoomend', () => {
+      if (popupOpenedAtZoom !== null && map.getZoom() <= popupOpenedAtZoom - 1) {
+        map.closePopup();
+      }
+    });
+
+    clusters.on('clusterclick', (e: any) => {
+      const markers: any[] = e.layer.getAllChildMarkers();
+      const rows = markers
+        .map((m, i) =>
+          `<div class="cl-item" data-i="${i}">${escHtml(m._lm.name)}<span class="cl-type">${escHtml(m._lm.type)}</span></div>`
+        )
+        .join('');
+
+      L.popup({ maxWidth: 280 })
+        .setLatLng(e.layer.getLatLng())
+        .setContent(`<div class="cl-list">${rows}</div>`)
+        .openOn(map);
+
+      setTimeout(() => {
+        document.querySelectorAll('.cl-item').forEach((el) => {
+          el.addEventListener('click', () => {
+            const lm = markers[Number((el as HTMLElement).dataset.i)]._lm;
+            map.closePopup();
+            L.popup({ maxWidth: 260 })
+              .setLatLng([lm.lat, lm.lng])
+              .setContent(
+                `<strong>${escHtml(lm.name)}</strong>` +
+                `<br><span class="popup-type">${escHtml(lm.type)}</span>` +
+                `<br><br>${escHtml(lm.snippet)}`
+              )
+              .openOn(map);
+          });
+        });
+      }, 0);
+    });
+
   } catch (e) {
     console.error('[map] Failed to load landmark data:', e);
   }
