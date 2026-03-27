@@ -70,16 +70,12 @@ async function init() {
     for (const lm of landmarks) {
       const marker = L.marker([lm.lat, lm.lng], { icon: markerIcon });
       (marker as any)._lm = lm;
-      marker.on('click', () => {
-        L.popup({ maxWidth: 260 })
-          .setLatLng(marker.getLatLng())
-          .setContent(
-            `<strong>${escHtml(lm.name)}</strong>` +
-            `<br><span class="popup-type">${escHtml(lm.type)}</span>` +
-            `<br><br>${escHtml(lm.snippet)}`
-          )
-          .openOn(map);
-      });
+      marker.bindPopup(
+        `<strong>${escHtml(lm.name)}</strong>` +
+        `<br><span class="popup-type">${escHtml(lm.type)}</span>` +
+        `<br><br>${escHtml(lm.snippet)}`,
+        { maxWidth: 260 }
+      );
       clusters.addLayer(marker);
     }
 
