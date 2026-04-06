@@ -6,6 +6,7 @@ import {
 import { getBridge } from './bridge';
 import { AppState, Landmark } from './types';
 import { getUnits } from './units';
+import { bearingTo, cardinalDirection } from './compass';
 import { DISPLAY_WIDTH, DISPLAY_HEIGHT, HEADER_HEIGHT, FOOTER_HEIGHT, VISIBLE_LANDMARKS } from './constants';
 
 const LIST_HEIGHT = DISPLAY_HEIGHT - HEADER_HEIGHT - FOOTER_HEIGHT;
@@ -20,7 +21,7 @@ function makeHeader(text: string): TextContainerProperty {
     height: HEADER_HEIGHT,
     borderWidth: 1,
     borderColor: 8,
-    borderRdaius: 6,
+    borderRadius: 6,
     paddingLength: 4,
     content: text,
     isEventCapture: 0,
@@ -39,7 +40,7 @@ function makeEventCapture(): TextContainerProperty {
     height: DISPLAY_HEIGHT,
     borderWidth: 0,
     borderColor: 0,
-    borderRdaius: 0,
+    borderRadius: 0,
     paddingLength: 0,
     content: ' ',
     isEventCapture: 1,
@@ -56,7 +57,45 @@ function makeContent(text: string): TextContainerProperty {
     height: LIST_HEIGHT,
     borderWidth: 0,
     borderColor: 0,
-    borderRdaius: 6,
+    borderRadius: 6,
+    paddingLength: 4,
+    content: text,
+    isEventCapture: 0,
+  });
+}
+
+// Width of the distance column on the right side of the list
+const DIST_COL_WIDTH = 65;
+const NAME_COL_WIDTH = DISPLAY_WIDTH - DIST_COL_WIDTH; // 456px
+
+function makeNameColumn(text: string): TextContainerProperty {
+  return new TextContainerProperty({
+    containerID: 2,
+    containerName: 'list-names',
+    xPosition: 0,
+    yPosition: HEADER_HEIGHT,
+    width: NAME_COL_WIDTH,
+    height: LIST_HEIGHT,
+    borderWidth: 0,
+    borderColor: 0,
+    borderRadius: 0,
+    paddingLength: 4,
+    content: text,
+    isEventCapture: 0,
+  });
+}
+
+function makeDistColumn(text: string): TextContainerProperty {
+  return new TextContainerProperty({
+    containerID: 3,
+    containerName: 'list-dists',
+    xPosition: NAME_COL_WIDTH,
+    yPosition: HEADER_HEIGHT,
+    width: DIST_COL_WIDTH,
+    height: LIST_HEIGHT,
+    borderWidth: 0,
+    borderColor: 0,
+    borderRadius: 0,
     paddingLength: 4,
     content: text,
     isEventCapture: 0,
@@ -73,14 +112,56 @@ function makeFooter(text: string): TextContainerProperty {
     height: FOOTER_HEIGHT,
     borderWidth: 1,
     borderColor: 5,
-    borderRdaius: 6,
+    borderRadius: 6,
     paddingLength: 4,
     content: text,
     isEventCapture: 0,
   });
 }
+// List view uses 5 containers (header, names, dists, footer, capture) so needs
+// dedicated footer/capture helpers with IDs 4 and 5 to avoid colliding with dist (ID 3).
+function makeListFooter(text: string): TextContainerProperty {
+  return new TextContainerProperty({
+    containerID: 4,
+    containerName: 'list-footer',
+    xPosition: 0,
+    yPosition: DISPLAY_HEIGHT - FOOTER_HEIGHT,
+    width: DISPLAY_WIDTH,
+    height: FOOTER_HEIGHT,
+    borderWidth: 1,
+    borderColor: 5,
+    borderRadius: 6,
+    paddingLength: 4,
+    content: text,
+    isEventCapture: 0,
+  });
+}
+
+function makeListCapture(): TextContainerProperty {
+  return new TextContainerProperty({
+    containerID: 5,
+    containerName: 'list-capture',
+    xPosition: 0,
+    yPosition: 0,
+    width: DISPLAY_WIDTH,
+    height: DISPLAY_HEIGHT,
+    borderWidth: 0,
+    borderColor: 0,
+    borderRadius: 0,
+    paddingLength: 0,
+    content: ' ',
+    isEventCapture: 1,
+  });
+}
+
 // Footer width: 576px, 4px padding each side ≈ 94 chars at ~6.2px avg
-const FOOTER_COLS = 94;
+const FOOTER_COLS = 99;
+// Header font is larger — ~46 chars across the same width
+const HEADER_COLS = 87;
+
+function headerBoth(left: string, right: string): string {
+  return left + ' '.repeat(Math.max(1, HEADER_COLS - left.length - right.length)) + right;
+}
 
 function footerRight(right: string): string {
   return ' '.repeat(Math.max(0, FOOTER_COLS - right.length)) + right;
@@ -134,37 +215,51 @@ export async function renderLoading(message = 'Finding nearby landmarks...'): Pr
   }));
 }
 
-// ~55 chars per line in the content area (576px - padding, at ~6.2px/char)
-const LIST_COLS = 55;
+// Names and distances are rendered in two side-by-side pixel-positioned containers so
+// distances always align to the same x regardless of proportional font character widths.
+// NAME_COL_WIDTH=456px, DIST_COL_WIDTH=120px (defined above with the container helpers).
+// NAME_COL_WIDTH is 511px. At ~12px/char for accented European text, 42 chars ≈ 504px — safe margin.
+const LIST_NAME_TRUNCATE = 42;
 
-function formatListText(landmarks: Landmark[], selectedIndex: number): string {
+function formatListColumns(
+  landmarks: Landmark[],
+  selectedIndex: number,
+  compassHighlight?: number | null,
+): { names: string; dists: string } {
   const start = Math.max(0, selectedIndex - (VISIBLE_LANDMARKS - 1));
   const end = Math.min(landmarks.length, start + VISIBLE_LANDMARKS);
 
-  const lines: string[] = [];
+  const nameLines: string[] = [];
+  const distLines: string[] = [];
   for (let i = start; i < end; i++) {
-    const prefix = i === selectedIndex ? '> ' : '  ';
-    const dist = formatDistance(landmarks[i].distance);
-    const maxName = LIST_COLS - prefix.length - dist.length - 1;
-    const name = truncate(landmarks[i].name, maxName);
-    const pad = ' '.repeat(Math.max(1, LIST_COLS - prefix.length - name.length - dist.length));
-    lines.push(prefix + name + pad + dist);
+    const isSelected = i === selectedIndex;
+    const isCompass = compassHighlight != null && i === compassHighlight;
+    const prefix = isSelected && isCompass ? '>*' : isSelected ? '> ' : isCompass ? '* ' : '  ';
+    nameLines.push(prefix + truncate(landmarks[i].name, LIST_NAME_TRUNCATE));
+    distLines.push(formatDistance(landmarks[i].distance));
   }
-  return lines.join('\n');
+  return { names: nameLines.join('\n'), dists: distLines.join('\n') };
 }
 
 export async function renderList(state: AppState): Promise<void> {
   const bridge = getBridge();
-  const footerText = state.city || 'Scroll: browse  Tap: details';
-  const listText = formatListText(state.landmarks, state.selectedIndex);
+  const lm = state.landmarks[state.selectedIndex];
+  let dirLabel = '';
+  if (state.userLat != null && state.userLng != null && lm?.lat != null && lm?.lng != null) {
+    dirLabel = cardinalDirection(bearingTo(state.userLat, state.userLng, lm.lat, lm.lng));
+  }
+  const leftText = state.city || 'Scroll: browse  Tap: details';
+  const footerText = dirLabel ? footerBoth(leftText, dirLabel) : leftText;
+  const { names, dists } = formatListColumns(state.landmarks, state.selectedIndex, state.compassHighlight);
 
   await bridge.rebuildPageContainer(new RebuildPageContainer({
-    containerTotalNum: 4,
+    containerTotalNum: 5,
     textObject: [
-      makeHeader('Nearby Landmarks'),
-      makeContent(listText),
-      makeFooter(footerBoth(footerText, 'Wondereye')),
-      makeEventCapture(),
+      makeHeader(headerBoth('Nearby Landmarks', 'Wondereye')),
+      makeNameColumn(names),
+      makeDistColumn(dists),
+      makeListFooter(footerText),
+      makeListCapture(),
     ],
   }));
 }
@@ -181,9 +276,12 @@ export function paginateText(text: string): string[] {
       pages.push(remaining);
       break;
     }
-    // Prefer breaking after a sentence-ending period within the limit
+    // Prefer breaking after a sentence-ending period, but only if it's at least
+    // 60% through the budget — avoids sparse pages when an early sentence ends well
+    // before the limit and the next one would overflow.
     const sentenceCut = remaining.lastIndexOf('. ', CHARS_PER_PAGE);
-    let cut = sentenceCut > 0 ? sentenceCut + 1 : remaining.lastIndexOf(' ', CHARS_PER_PAGE);
+    const minSentenceCut = CHARS_PER_PAGE * 0.6;
+    let cut = sentenceCut > minSentenceCut ? sentenceCut + 1 : remaining.lastIndexOf(' ', CHARS_PER_PAGE);
     if (cut <= 0) cut = CHARS_PER_PAGE;
     pages.push(remaining.slice(0, cut));
     remaining = remaining.slice(cut).trimStart();
@@ -218,6 +316,33 @@ export async function renderError(message: string): Promise<void> {
       makeHeader('Error'),
       makeContent(message),
       makeFooter(footerBoth('Tap: retry', 'Wondereye')),
+      makeEventCapture(),
+    ],
+  }));
+}
+
+export async function renderListening(): Promise<void> {
+  const bridge = getBridge();
+  await bridge.rebuildPageContainer(new RebuildPageContainer({
+    containerTotalNum: 4,
+    textObject: [
+      makeHeader('Wondereye'),
+      makeContent('Listening...\n\nSpeak a landmark name\nor what you want to find'),
+      makeFooter(footerBoth('Tap to stop', 'Wondereye')),
+      makeEventCapture(),
+    ],
+  }));
+}
+
+export async function renderVoiceResult(matched: string | null): Promise<void> {
+  const bridge = getBridge();
+  const content = matched ? `Found:\n${matched}` : 'No match found';
+  await bridge.rebuildPageContainer(new RebuildPageContainer({
+    containerTotalNum: 4,
+    textObject: [
+      makeHeader('Voice Search'),
+      makeContent(content),
+      makeFooter(footerRight('Wondereye')),
       makeEventCapture(),
     ],
   }));

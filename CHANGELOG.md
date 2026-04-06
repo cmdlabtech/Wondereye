@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.3.5 — 2026-04-06
+
+**Compass Direction**
+- Selected landmark now shows its cardinal direction (N, NE, E, SE, S, SW, W, NW) in the bottom-right of the footer, derived from your GPS position
+
+**Glasses & Web UI Improvements**
+- Setup URL box is now tap-to-copy — no separate button needed
+- Setup label clarified inline with *(tap to copy)* hint
+
 ## v1.0.0 — 2026-03-02
 
 Initial release.

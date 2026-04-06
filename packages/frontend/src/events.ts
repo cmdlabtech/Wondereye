@@ -3,17 +3,26 @@ import { getBridge } from './bridge';
 import { AppState } from './types';
 import { renderList, renderReadingPage, updateListContent, paginateText } from './renderer';
 import { fetchLandmarkDetail } from './api';
-
-const IMU_DATA_REPORT = 8; // OsEventTypeList.IMU_DATA_REPORT added in SDK 0.0.9
+import { startVoiceRecording, stopVoiceRecording } from './voice';
+import { recordVisit } from './history';
+import { getUnits } from './units';
 
 export function setupEventHandlers(
   state: AppState,
   onRefresh: () => void,
-  onIMUEvent?: (event: any) => void
+  onIMUEvent?: (event: any) => void,
+  onAudioEvent?: (event: any) => void,
+  onHistoryUpdate?: () => void,
 ): void {
   const bridge = getBridge();
 
   bridge.onEvenHubEvent(async (event: any) => {
+    // Audio events are routed to the voice handler before anything else
+    if (event.audioEvent) {
+      onAudioEvent?.(event);
+      return;
+    }
+
     // Ignore lifecycle system events (foreground/background), not user input.
     // The SDK sends periodic sysEvents (enter/exit) while idle; filtering only
     // these specific types prevents idle crashes while allowing tap/scroll sysEvents through.
@@ -25,7 +34,7 @@ export function setupEventHandlers(
         console.log('[events] lifecycle sysEvent ignored:', sysEventType);
         return;
       }
-      if (sysEventType === IMU_DATA_REPORT) {
+      if (sysEventType === OsEventTypeList.IMU_DATA_REPORT) {
         onIMUEvent?.(event);
         return;
       }
@@ -45,6 +54,14 @@ export function setupEventHandlers(
     if (eventType == null) return;
 
     try {
+      // While listening, only a tap stops recording — all other events are swallowed
+      if (state.mode === 'listening') {
+        if (eventType === OsEventTypeList.CLICK_EVENT) {
+          await stopVoiceRecording(state);
+        }
+        return;
+      }
+
       if (eventType === OsEventTypeList.DOUBLE_CLICK_EVENT) {
         if (state.mode === 'reading') {
           state.mode = 'list';
@@ -52,7 +69,9 @@ export function setupEventHandlers(
           state.readingPages = undefined;
           state.detailLoaded = undefined;
           await renderList(state);
-        } else if (state.mode !== 'loading') {
+        } else if (state.mode === 'list') {
+          startVoiceRecording(state);
+        } else if (state.mode === 'error') {
           onRefresh();
         }
         return;
@@ -60,7 +79,7 @@ export function setupEventHandlers(
 
       switch (state.mode) {
         case 'list':    await handleListEvent(eventType, state); break;
-        case 'reading': await handleReadingEvent(eventType, state); break;
+        case 'reading': await handleReadingEvent(eventType, state, bridge, onHistoryUpdate); break;
         case 'error':
           if (eventType === OsEventTypeList.CLICK_EVENT) onRefresh();
           break;
@@ -69,18 +88,6 @@ export function setupEventHandlers(
       console.error('[events] handler error:', err);
     }
   });
-}
-
-export async function triggerClick(state: AppState, onRefresh: () => void): Promise<void> {
-  try {
-    switch (state.mode) {
-      case 'list':    await handleListEvent(OsEventTypeList.CLICK_EVENT, state); break;
-      case 'reading': await handleReadingEvent(OsEventTypeList.CLICK_EVENT, state); break;
-      case 'error':   onRefresh(); break;
-    }
-  } catch (err) {
-    console.error('[events] triggerClick error:', err);
-  }
 }
 
 async function handleListEvent(eventType: number, state: AppState): Promise<void> {
@@ -111,7 +118,7 @@ async function handleListEvent(eventType: number, state: AppState): Promise<void
   }
 }
 
-async function handleReadingEvent(eventType: number, state: AppState): Promise<void> {
+async function handleReadingEvent(eventType: number, state: AppState, bridge: any, onHistoryUpdate?: () => void): Promise<void> {
   const pages = state.readingPages || [];
   const page = state.readingPage ?? 0;
   const landmark = state.landmarks[state.selectedIndex];
@@ -121,7 +128,7 @@ async function handleReadingEvent(eventType: number, state: AppState): Promise<v
       if (!state.detailLoaded) {
         state.detailLoaded = true;
         await renderReadingPage(landmark, pages[page], page, pages.length, true, true);
-        fetchLandmarkDetail(landmark.name).then(async detail => {
+        fetchLandmarkDetail(landmark.name, getUnits()).then(async detail => {
           if (state.mode !== 'reading' || state.landmarks[state.selectedIndex] !== landmark) return;
           const combined = landmark.snippet + (detail ? '\n\n' + detail + '\n' : '');
           state.readingPages = paginateText(combined);
@@ -134,6 +141,10 @@ async function handleReadingEvent(eventType: number, state: AppState): Promise<v
             false,
             true,
           );
+          // Record this landmark in the visit history, then refresh the phone UI list
+          if (detail) {
+            recordVisit(bridge, landmark).then(() => onHistoryUpdate?.()).catch(() => {});
+          }
         }).catch(() => { /* snippet already showing — silently ignore */ });
       }
       break;

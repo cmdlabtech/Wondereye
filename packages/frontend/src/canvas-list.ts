@@ -1,11 +1,10 @@
 import { Landmark } from './types';
 
-// SDK ImageContainerProperty hard limits: width 20-200px, height 20-100px.
-// Both confirmed to crash the glasses firmware when exceeded.
-export const IMAGE_WIDTH = 200;
-export const IMAGE_HEIGHT = 100;
-const VISIBLE_ROWS = 5; // 5 rows × 20px = 100px
-const ROW_H = Math.floor(IMAGE_HEIGHT / VISIBLE_ROWS); // 20px
+// SDK ImageContainerProperty hard limits: width 20-288px, height 20-144px (as of SDK 0.0.8 / firmware 2.1.1).
+export const IMAGE_WIDTH = 288;
+export const IMAGE_HEIGHT = 144;
+const VISIBLE_ROWS = 5; // 5 rows × ~28px ≈ 144px
+const ROW_H = Math.floor(IMAGE_HEIGHT / VISIBLE_ROWS); // ~28px
 const ICON_SIZE = 14;
 const ICON_PAD = 4;
 const TEXT_X = ICON_PAD + ICON_SIZE + 4;

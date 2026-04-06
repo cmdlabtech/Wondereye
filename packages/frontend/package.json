@@ -8,8 +8,8 @@
     "pack": "npm run build && evenhub pack app.json dist -o wondereye.ehpk"
   },
   "dependencies": {
-    "@evenrealities/even_hub_sdk": "latest",
-    "@evenrealities/evenhub-simulator": "^0.5.0",
+    "@evenrealities/even_hub_sdk": "^0.0.9",
+    "@evenrealities/evenhub-simulator": "^0.6.2",
     "@types/leaflet.markercluster": "^1.5.6",
     "leaflet": "^1.9.4",
     "leaflet.markercluster": "^1.5.3"

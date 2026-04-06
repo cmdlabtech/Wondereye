@@ -202,12 +202,16 @@ app.post('/api/landmark-detail', async (c) => {
     return c.json({ error: 'Invalid JSON body' }, 400);
   }
 
-  const { name } = body;
+  const { name, units } = body;
   if (typeof name !== 'string' || name.length === 0 || name.length > 200) {
     return c.json({ error: 'name is required (string, max 200 chars)' }, 400);
   }
+  const unitSystem: 'imperial' | 'metric' = units === 'metric' ? 'metric' : 'imperial';
+  const unitHint = unitSystem === 'metric'
+    ? 'Use metric units (meters, kilometers) for any distances or measurements.'
+    : 'Use imperial units (feet, miles) for any distances or measurements.';
 
-  const detailKey = `detail:${name.toLowerCase().trim()}`;
+  const detailKey = `detail:${name.toLowerCase().trim()}:${unitSystem}`;
   const cachedDetail = await c.env.LANDMARKS_CACHE.get(detailKey, 'json');
   if (cachedDetail) {
     return c.json(cachedDetail);
@@ -228,7 +232,7 @@ app.post('/api/landmark-detail', async (c) => {
         messages: [
           {
             role: 'system',
-            content: 'You are a knowledgeable tour guide. Look up every landmark in Grokipedia first to ensure accurate, factual information. Write in plain text with no markdown, no bullet points, no special formatting.',
+            content: `You are a knowledgeable tour guide. Look up every landmark in Grokipedia first to ensure accurate, factual information. Write in plain text with no markdown, no bullet points, no special formatting. ${unitHint}`,
           },
           {
             role: 'user',
@@ -257,6 +261,113 @@ app.post('/api/landmark-detail', async (c) => {
     console.error('[api] landmark-detail error:', err);
     return c.json({ detail: '' });
   }
+});
+
+app.post('/api/transcribe', async (c) => {
+  const ip = c.req.header('cf-connecting-ip');
+  if (!ip && c.env.DEV !== 'true') return c.json({ error: 'Too many requests. Try again shortly.' }, 429);
+  if (ip && !checkRateLimit(ip)) {
+    return c.json({ error: 'Too many requests. Try again shortly.' }, 429);
+  }
+
+  let formData: FormData;
+  try {
+    formData = await c.req.formData();
+  } catch {
+    return c.json({ error: 'Invalid multipart body' }, 400);
+  }
+
+  const file = formData.get('file');
+  const landmarksRaw = formData.get('landmarks');
+
+  if (!file || typeof file === 'string') return c.json({ error: 'file is required' }, 400);
+  const audioFile = file as File;
+  if (audioFile.size > 2_000_000) return c.json({ error: 'Audio file too large (max 2MB)' }, 400);
+
+  let landmarks: { name: string }[] = [];
+  try {
+    const parsed = JSON.parse(landmarksRaw as string);
+    if (!Array.isArray(parsed) || parsed.length === 0) throw new Error();
+    landmarks = parsed.slice(0, 10).filter((l: any) => typeof l.name === 'string' && l.name.length > 0);
+  } catch {
+    return c.json({ error: 'landmarks must be a non-empty JSON array' }, 400);
+  }
+
+  // Forward audio to xAI Whisper-compatible STT endpoint
+  const sttForm = new FormData();
+  sttForm.append('file', audioFile, 'audio.wav');
+  sttForm.append('model', 'whisper-1');
+
+  let transcribedText = '';
+  try {
+    const sttRes = await fetch('https://api.x.ai/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${c.env.XAI_API_KEY}` },
+      body: sttForm,
+    });
+    if (!sttRes.ok) {
+      console.error('[transcribe] STT error:', sttRes.status, await sttRes.text().catch(() => ''));
+      return c.json({ error: 'Speech recognition failed. Please try again.' }, 502);
+    }
+    const sttData: any = await sttRes.json();
+    transcribedText = (sttData.text || '').trim();
+  } catch (err) {
+    console.error('[transcribe] STT fetch error:', err);
+    return c.json({ error: 'Speech recognition failed. Please try again.' }, 502);
+  }
+
+  if (!transcribedText) {
+    return c.json({ matched: null, query: '' });
+  }
+
+  // Fuzzy-match the transcribed text against the provided landmark names using Grok
+  const nameList = landmarks.map(l => `"${l.name.replace(/["\\]/g, ' ').trim()}"`).join(', ');
+  const safQuery = transcribedText.replace(/["\\]/g, ' ').replace(/[\r\n]/g, ' ').trim();
+
+  let matched: string | null = null;
+  try {
+    const grokRes = await fetch('https://api.x.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${c.env.XAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'grok-4-1-fast-non-reasoning',
+        max_tokens: 60,
+        messages: [
+          {
+            role: 'system',
+            content: 'You match voice queries to landmark names. Return ONLY valid JSON with no other text.',
+          },
+          {
+            role: 'user',
+            content: `Voice query: "${safQuery}"\nLandmark names: [${nameList}]\nReturn JSON: {"matched": "<exact name from list, or null if no match>"}`,
+          },
+        ],
+      }),
+    });
+    if (grokRes.ok) {
+      const grokData: any = await grokRes.json();
+      const content = (grokData.choices?.[0]?.message?.content || '').trim();
+      try {
+        const parsed = JSON.parse(content);
+        if (typeof parsed.matched === 'string' && parsed.matched !== 'null') {
+          matched = parsed.matched;
+        }
+      } catch {
+        // Fallback: substring match on raw transcription
+        const lowerQuery = transcribedText.toLowerCase();
+        matched = landmarks.find(l => lowerQuery.includes(l.name.toLowerCase()))?.name ?? null;
+      }
+    }
+  } catch (err) {
+    console.error('[transcribe] Grok match error:', err);
+    // Fall through with matched = null — caller gets the transcription without a match
+  }
+
+  // No KV cache — each audio recording is unique and not worth caching
+  return c.json({ matched, query: transcribedText });
 });
 
 async function hashUid(uid: number): Promise<string> {

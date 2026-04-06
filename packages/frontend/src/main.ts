@@ -2,11 +2,15 @@ import { initBridge } from './bridge';
 import { getBridge } from './bridge';
 import { getCurrentPosition, LocationError } from './geo';
 import { fetchLandmarks, fetchUserLocation } from './api';
-import { renderStartup, renderLoading, renderList, renderError } from './renderer';
-import { setupEventHandlers, triggerClick } from './events';
+import { renderStartup, renderLoading, renderList, renderError, renderReadingPage } from './renderer';
+import { setupEventHandlers } from './events';
 import { initIMU } from './imu';
-import { AppState } from './types';
+import { handleAudioChunk } from './voice';
+import { loadHistory } from './history';
+import { updateCompassHeading } from './compass';
+import { AppState, HistoryEntry } from './types';
 import { reverseGeocode } from './geocode';
+import { getUnits, setUnits } from './units';
 
 const state: AppState = {
   landmarks: [],
@@ -46,6 +50,54 @@ function showPhoneSetupLink(uid: number) {
   section.style.display = 'block';
 }
 
+function renderPhoneHistory(entries: HistoryEntry[]): void {
+  const section = document.getElementById('history-section');
+  const list = document.getElementById('history-list');
+  if (!section || !list) return;
+
+  if (entries.length === 0) {
+    section.style.display = 'none';
+    return;
+  }
+
+  const recent = entries.slice(0, 10);
+  list.replaceChildren();
+  for (const entry of recent) {
+    const date = new Date(entry.visitedAt).toLocaleDateString('en', { month: 'short', day: 'numeric' });
+    const snippet = entry.snippet.length > 60 ? entry.snippet.slice(0, 57) + '...' : entry.snippet;
+    const type = entry.type.replace(/_/g, ' ');
+
+    const div = document.createElement('div');
+    div.className = 'history-entry';
+
+    const header = document.createElement('div');
+    header.className = 'history-header';
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'history-name';
+    nameSpan.textContent = entry.name;
+
+    const typeSpan = document.createElement('span');
+    typeSpan.className = 'history-type';
+    typeSpan.textContent = type;
+
+    const dateSpan = document.createElement('span');
+    dateSpan.className = 'history-date';
+    dateSpan.textContent = date;
+
+    header.append(nameSpan, typeSpan, dateSpan);
+
+    const snippetDiv = document.createElement('div');
+    snippetDiv.className = 'history-snippet';
+    snippetDiv.textContent = snippet;
+
+    div.append(header, snippetDiv);
+    list.appendChild(div);
+  }
+
+  section.style.display = 'block';
+}
+
 async function getLocation(): Promise<{ lat: number; lng: number }> {
   // Allow overriding location via URL params (for simulator)
   const params = new URLSearchParams(window.location.search);
@@ -82,6 +134,11 @@ async function loadLandmarks(): Promise<void> {
     setPhoneLocationStatus('Getting location...');
     const { lat, lng } = await getLocation();
 
+    // Store coordinates for compass bearing calculations; reset compass calibration
+    state.userLat = lat;
+    state.userLng = lng;
+    state.imuBaseline = undefined;
+
     const [landmarks, city] = await Promise.all([
       fetchLandmarks(lat, lng),
       reverseGeocode(lat, lng),
@@ -101,6 +158,9 @@ async function loadLandmarks(): Promise<void> {
     state.mode = 'list';
     state.city = city;
     await renderList(state);
+
+    // Refresh phone history display after each successful landmark load
+    loadHistory(getBridge()).then(renderPhoneHistory).catch(() => {});
   } catch (error) {
     console.error('[app] loadLandmarks error:', error);
     state.mode = 'error';
@@ -122,8 +182,48 @@ async function loadLandmarks(): Promise<void> {
   }
 }
 
+async function rerenderCurrentView(): Promise<void> {
+  if (state.mode === 'list') {
+    await renderList(state);
+  } else if (state.mode === 'reading') {
+    const pages = state.readingPages || [];
+    const page = state.readingPage ?? 0;
+    const landmark = state.landmarks[state.selectedIndex];
+    if (landmark) {
+      await renderReadingPage(landmark, pages[page], page, pages.length, false, !!state.detailLoaded);
+    }
+  }
+}
+
+function initUnitsToggle(): void {
+  const imperialBtn = document.getElementById('units-imperial');
+  const metricBtn = document.getElementById('units-metric');
+  if (!imperialBtn || !metricBtn) return;
+
+  const refresh = () => {
+    const current = getUnits();
+    imperialBtn.classList.toggle('active', current === 'imperial');
+    metricBtn.classList.toggle('active', current === 'metric');
+  };
+
+  refresh();
+
+  imperialBtn.addEventListener('click', () => {
+    setUnits('imperial');
+    refresh();
+    rerenderCurrentView().catch(() => {});
+  });
+
+  metricBtn.addEventListener('click', () => {
+    setUnits('metric');
+    refresh();
+    rerenderCurrentView().catch(() => {});
+  });
+}
+
 async function main(): Promise<void> {
   try {
+    initUnitsToggle();
     setPhoneStatus('Connecting...');
     setPhoneDot('connection-dot', 'loading');
     await initBridge();
@@ -145,13 +245,26 @@ async function main(): Promise<void> {
       console.warn('[app] getUserInfo failed:', e);
     }
 
+    // Load and display landmark visit history on the phone companion UI
+    loadHistory(getBridge()).then(renderPhoneHistory).catch(() => {});
+
+    // Initialize IMU for compass heading tracking (nod gesture removed)
     let imuHandler: ((event: any) => void) | undefined;
     try {
-      imuHandler = initIMU(getBridge(), () => triggerClick(state, loadLandmarks));
+      imuHandler = initIMU(getBridge(), {
+        onHeadingUpdate: (x, _y) => updateCompassHeading(state, x),
+      });
     } catch (err) {
       console.warn('[app] IMU not available:', err);
     }
-    setupEventHandlers(state, loadLandmarks, imuHandler);
+
+    setupEventHandlers(
+      state,
+      loadLandmarks,
+      imuHandler,
+      (event) => handleAudioChunk(state, event),
+      () => loadHistory(getBridge()).then(renderPhoneHistory).catch(() => {}),
+    );
     await loadLandmarks();
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Unknown error';
