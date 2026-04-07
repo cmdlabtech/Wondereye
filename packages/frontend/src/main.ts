@@ -1,6 +1,5 @@
 import { initBridge } from './bridge';
 import { getBridge } from './bridge';
-import { waitForEvenAppBridge } from '@evenrealities/even_hub_sdk';
 import { getCurrentPosition, LocationError } from './geo';
 import { fetchLandmarks, fetchUserLocation } from './api';
 import { renderStartup, renderLoading, renderList, renderError, renderReadingPage } from './renderer';
@@ -222,19 +221,6 @@ function initUnitsToggle(): void {
 }
 
 async function main(): Promise<void> {
-  // Guard: app.html is only for EvenHub. Redirect regular browsers to the homepage.
-  const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-  if (!isLocalhost) {
-    const bridgeAvailable = await Promise.race([
-      waitForEvenAppBridge().then(() => true),
-      new Promise<boolean>(resolve => setTimeout(() => resolve(false), 3000)),
-    ]);
-    if (!bridgeAvailable) {
-      location.replace('https://wondereye.app');
-      return;
-    }
-  }
-
   try {
     initUnitsToggle();
     setPhoneStatus('Connecting...');
@@ -244,19 +230,33 @@ async function main(): Promise<void> {
     setPhoneStatus('Connected');
     setPhoneDot('connection-dot', 'active');
 
-    // Initialize glasses display exactly once (SDK requires createStartUpPageContainer called once)
-    await renderStartup();
-
-    // Get Even user uid for location persistence
+    // Verify this is a real EvenHub session: getUserInfo() returns uid=0 in a regular browser.
+    // On production, redirect non-EvenHub visitors to the homepage before rendering anything.
+    const isProd = location.hostname === 'wondereye.app';
+    let resolvedUid: number | undefined;
     try {
       const user = await getBridge().getUserInfo();
       if (user?.uid) {
-        state.uid = user.uid;
-        showPhoneSetupLink(user.uid);
+        resolvedUid = user.uid;
+      } else if (isProd) {
+        location.replace('https://wondereye.app');
+        return;
       }
     } catch (e) {
+      if (isProd) {
+        location.replace('https://wondereye.app');
+        return;
+      }
       console.warn('[app] getUserInfo failed:', e);
     }
+
+    if (resolvedUid) {
+      state.uid = resolvedUid;
+      showPhoneSetupLink(resolvedUid);
+    }
+
+    // Initialize glasses display exactly once (SDK requires createStartUpPageContainer called once)
+    await renderStartup();
 
     // Load and display landmark visit history on the phone companion UI
     loadHistory(getBridge()).then(renderPhoneHistory).catch(() => {});
