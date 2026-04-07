@@ -2,12 +2,10 @@
 
 ## v1.3.5 — 2026-04-06
 
-**Compass Direction**
-- Selected landmark now shows its cardinal direction (N, NE, E, SE, S, SW, W, NW) in the bottom-right of the footer, derived from your GPS position
-
-**Glasses & Web UI Improvements**
-- Setup URL box is now tap-to-copy — no separate button needed
-- Setup label clarified inline with *(tap to copy)* hint
+- Compass direction (N, NE, E, SE…) to the selected landmark shown in the list footer
+- Recently viewed landmarks tracked in the settings screen
+- Imperial/metric unit toggle, applied to distances and AI detail responses
+- Security: input sanitization on Grok requests; rate limiting on new API endpoints
 
 ## v1.0.0 — 2026-03-02
 

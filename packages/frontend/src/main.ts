@@ -5,7 +5,6 @@ import { fetchLandmarks, fetchUserLocation } from './api';
 import { renderStartup, renderLoading, renderList, renderError, renderReadingPage } from './renderer';
 import { setupEventHandlers } from './events';
 import { initIMU } from './imu';
-import { handleAudioChunk } from './voice';
 import { loadHistory } from './history';
 import { updateCompassHeading } from './compass';
 import { AppState, HistoryEntry } from './types';
@@ -262,7 +261,6 @@ async function main(): Promise<void> {
       state,
       loadLandmarks,
       imuHandler,
-      (event) => handleAudioChunk(state, event),
       () => loadHistory(getBridge()).then(renderPhoneHistory).catch(() => {}),
     );
     await loadLandmarks();

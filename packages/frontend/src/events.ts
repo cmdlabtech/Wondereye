@@ -3,7 +3,6 @@ import { getBridge } from './bridge';
 import { AppState } from './types';
 import { renderList, renderReadingPage, updateListContent, paginateText } from './renderer';
 import { fetchLandmarkDetail } from './api';
-import { startVoiceRecording, stopVoiceRecording } from './voice';
 import { recordVisit } from './history';
 import { getUnits } from './units';
 
@@ -11,17 +10,11 @@ export function setupEventHandlers(
   state: AppState,
   onRefresh: () => void,
   onIMUEvent?: (event: any) => void,
-  onAudioEvent?: (event: any) => void,
   onHistoryUpdate?: () => void,
 ): void {
   const bridge = getBridge();
 
   bridge.onEvenHubEvent(async (event: any) => {
-    // Audio events are routed to the voice handler before anything else
-    if (event.audioEvent) {
-      onAudioEvent?.(event);
-      return;
-    }
 
     // Ignore lifecycle system events (foreground/background), not user input.
     // The SDK sends periodic sysEvents (enter/exit) while idle; filtering only
@@ -54,14 +47,6 @@ export function setupEventHandlers(
     if (eventType == null) return;
 
     try {
-      // While listening, only a tap stops recording — all other events are swallowed
-      if (state.mode === 'listening') {
-        if (eventType === OsEventTypeList.CLICK_EVENT) {
-          await stopVoiceRecording(state);
-        }
-        return;
-      }
-
       if (eventType === OsEventTypeList.DOUBLE_CLICK_EVENT) {
         if (state.mode === 'reading') {
           state.mode = 'list';
@@ -70,7 +55,7 @@ export function setupEventHandlers(
           state.detailLoaded = undefined;
           await renderList(state);
         } else if (state.mode === 'list') {
-          startVoiceRecording(state);
+          onRefresh();
         } else if (state.mode === 'error') {
           onRefresh();
         }
