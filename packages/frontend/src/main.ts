@@ -1,5 +1,6 @@
 import { initBridge } from './bridge';
 import { getBridge } from './bridge';
+import { waitForEvenAppBridge } from '@evenrealities/even_hub_sdk';
 import { getCurrentPosition, LocationError } from './geo';
 import { fetchLandmarks, fetchUserLocation } from './api';
 import { renderStartup, renderLoading, renderList, renderError, renderReadingPage } from './renderer';
@@ -221,6 +222,19 @@ function initUnitsToggle(): void {
 }
 
 async function main(): Promise<void> {
+  // Guard: app.html is only for EvenHub. Redirect regular browsers to the homepage.
+  const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  if (!isLocalhost) {
+    const bridgeAvailable = await Promise.race([
+      waitForEvenAppBridge().then(() => true),
+      new Promise<boolean>(resolve => setTimeout(() => resolve(false), 3000)),
+    ]);
+    if (!bridgeAvailable) {
+      location.replace('https://wondereye.app');
+      return;
+    }
+  }
+
   try {
     initUnitsToggle();
     setPhoneStatus('Connecting...');
