@@ -308,6 +308,27 @@ export async function renderReadingPage(landmark: Landmark, page: string, _pageN
   }));
 }
 
+export async function renderSetupNotice(uid?: number): Promise<void> {
+  const bridge = getBridge();
+  const urlLine = uid
+    ? `wondereye.app/?uid=${uid}`
+    : 'wondereye.app';
+  const content =
+    `Welcome! To see landmarks near you,\n` +
+    `open this on your phone's browser:\n\n` +
+    `${urlLine}\n\n` +
+    `Then tap "Use My Location".`;
+  await bridge.rebuildPageContainer(new RebuildPageContainer({
+    containerTotalNum: 4,
+    textObject: [
+      makeHeader('Wondereye — Setup'),
+      makeContent(content),
+      makeFooter(footerBoth('Tap: continue', 'Wondereye')),
+      makeEventCapture(),
+    ],
+  }));
+}
+
 export async function renderError(message: string): Promise<void> {
   const bridge = getBridge();
   await bridge.rebuildPageContainer(new RebuildPageContainer({

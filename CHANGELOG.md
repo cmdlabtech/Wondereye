@@ -6,6 +6,7 @@
 - Recently viewed landmarks tracked in the settings screen
 - Imperial/metric unit toggle, applied to distances and AI detail responses
 - Security: input sanitization on Grok requests; rate limiting on new API endpoints
+- Glasses and App UI bug fixes and improvements
 
 ## v1.0.0 — 2026-03-02
 

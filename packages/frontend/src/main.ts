@@ -2,7 +2,7 @@ import { initBridge } from './bridge';
 import { getBridge } from './bridge';
 import { getCurrentPosition, LocationError } from './geo';
 import { fetchLandmarks, fetchUserLocation } from './api';
-import { renderStartup, renderLoading, renderList, renderError, renderReadingPage } from './renderer';
+import { renderStartup, renderLoading, renderList, renderError, renderReadingPage, renderSetupNotice } from './renderer';
 import { setupEventHandlers } from './events';
 import { initIMU } from './imu';
 import { loadHistory } from './history';
@@ -230,23 +230,20 @@ async function main(): Promise<void> {
     setPhoneStatus('Connected');
     setPhoneDot('connection-dot', 'active');
 
-    // Verify this is a real EvenHub session: getUserInfo() returns uid=0 in a regular browser.
-    // On production, redirect non-EvenHub visitors to the homepage before rendering anything.
-    const isProd = location.hostname === 'wondereye.app';
+    // Initialize glasses display immediately so something shows on-screen.
+    // SDK requires createStartUpPageContainer called exactly once, before any rebuildPageContainer.
+    await renderStartup();
+
+    // Resolve Even account uid with a timeout — getUserInfo can hang or return uid=0
+    // on new/test accounts. Never redirect based on this result.
     let resolvedUid: number | undefined;
     try {
-      const user = await getBridge().getUserInfo();
-      if (user?.uid) {
-        resolvedUid = user.uid;
-      } else if (isProd) {
-        location.replace('https://wondereye.app');
-        return;
-      }
+      const user = await Promise.race([
+        getBridge().getUserInfo(),
+        new Promise<null>(resolve => setTimeout(() => resolve(null), 2000)),
+      ]);
+      if (user?.uid) resolvedUid = user.uid;
     } catch (e) {
-      if (isProd) {
-        location.replace('https://wondereye.app');
-        return;
-      }
       console.warn('[app] getUserInfo failed:', e);
     }
 
@@ -255,13 +252,10 @@ async function main(): Promise<void> {
       showPhoneSetupLink(resolvedUid);
     }
 
-    // Initialize glasses display exactly once (SDK requires createStartUpPageContainer called once)
-    await renderStartup();
-
     // Load and display landmark visit history on the phone companion UI
     loadHistory(getBridge()).then(renderPhoneHistory).catch(() => {});
 
-    // Initialize IMU for compass heading tracking (nod gesture removed)
+    // Initialize IMU for compass heading tracking
     let imuHandler: ((event: any) => void) | undefined;
     try {
       imuHandler = initIMU(getBridge(), {
@@ -277,7 +271,18 @@ async function main(): Promise<void> {
       imuHandler,
       () => loadHistory(getBridge()).then(renderPhoneHistory).catch(() => {}),
     );
-    await loadLandmarks();
+
+    // Check if user has set up their location via the phone bridge.
+    // If not, show a first-time setup notice on the glasses instead of jumping
+    // straight to landmarks. Tap on the glasses will trigger loadLandmarks
+    // (mode='error' reuses the existing tap-to-retry handler in events.ts).
+    const hasStoredLocation = resolvedUid ? await fetchUserLocation(resolvedUid) : null;
+    if (!hasStoredLocation) {
+      state.mode = 'error';
+      await renderSetupNotice(resolvedUid);
+    } else {
+      await loadLandmarks();
+    }
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Unknown error';
     console.error('[app] main error:', msg, error);
