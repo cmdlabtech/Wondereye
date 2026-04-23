@@ -10,8 +10,7 @@
   "author": "cmdlabtech",
   "supported_languages": ["en"],
   "permissions": [
-    { "name": "network", "desc": "Fetch landmark data from the Wondereye API" },
-    { "name": "g2-microphone", "desc": "Voice search for landmarks" }
+    { "name": "network", "desc": "Fetch landmark data from the Wondereye API" }
   ],
   "entrypoint": "app.html"
 }
