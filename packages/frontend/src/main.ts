@@ -1,6 +1,6 @@
 import { initBridge } from './bridge';
 import { getBridge } from './bridge';
-import { getCurrentPosition, LocationError } from './geo';
+import { getCurrentPosition, getCachedLocation, cacheLocation, LocationError } from './geo';
 import { fetchLandmarks, fetchUserLocation } from './api';
 import { renderStartup, renderLoading, renderList, renderError, renderReadingPage, renderSetupNotice } from './renderer';
 import { setupEventHandlers } from './events';
@@ -107,10 +107,26 @@ async function getLocation(): Promise<{ lat: number; lng: number }> {
     return { lat: paramLat, lng: paramLng };
   }
 
+  // Try cached location on glasses (7-day expiry)
+  const bridge = getBridge();
+  if (bridge) {
+    const cached = await getCachedLocation(bridge);
+    if (cached) {
+      console.log('[geo] using cached location:', cached.lat, cached.lng);
+      return { lat: cached.lat, lng: cached.lng };
+    }
+  }
+
   // Try location stored via the homepage (uid-based)
   if (state.uid) {
     const stored = await fetchUserLocation(state.uid);
-    if (stored) return stored;
+    if (stored) {
+      // Cache the retrieved location on glasses
+      if (bridge) {
+        await cacheLocation(bridge, stored.lat, stored.lng);
+      }
+      return stored;
+    }
   }
 
   try {
