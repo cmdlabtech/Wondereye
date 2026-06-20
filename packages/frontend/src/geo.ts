@@ -41,11 +41,31 @@ function cacheLocation(lat: number, lng: number): void {
   }
 }
 
-function requestPosition(opts: PositionOptions): Promise<{ lat: number; lng: number }> {
+function requestPosition(opts: PositionOptions, hardTimeoutMs: number): Promise<{ lat: number; lng: number }> {
   return new Promise((resolve, reject) => {
+    // Outer guard: on some Android WebView builds (when the host app doesn't
+    // wire up onGeolocationPermissionsShowPrompt) getCurrentPosition never fires
+    // ANY callback — not even the W3C `timeout` error — and would otherwise hang
+    // loadLandmarks() at "Getting location…" forever. This ceiling guarantees we
+    // always settle so callers can fall back to the cached fix or Prague.
+    let settled = false;
+    const guard = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject({ code: 'timeout', message: 'Location request timed out.' } as LocationError);
+    }, hardTimeoutMs);
+
     navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      (pos) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(guard);
+        resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+      },
       (err) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(guard);
         // PositionError.code: 1=denied, 2=unavailable (position), 3=timeout
         let mapped: LocationError;
         if (err.code === 1) {
@@ -82,12 +102,18 @@ export async function getCurrentPosition(): Promise<{ lat: number; lng: number }
   }
 
   // Try high-accuracy GPS first, then fall back to a faster low-accuracy fix
-  // (mirrors the two-try pattern proven in the old phone setup flow).
+  // (mirrors the two-try pattern proven in the old phone setup flow). Each
+  // attempt has a hard ceiling slightly above its W3C `timeout` so a hung
+  // WebView call can't stall us indefinitely.
   let fix: { lat: number; lng: number };
   try {
-    fix = await requestPosition({ enableHighAccuracy: true, timeout: 20000, maximumAge: 60000 });
-  } catch {
-    fix = await requestPosition({ enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 });
+    fix = await requestPosition({ enableHighAccuracy: true, timeout: 20000, maximumAge: 60000 }, 23000);
+  } catch (e) {
+    const code = (e as LocationError).code;
+    // A denied/unsupported result won't change on a low-accuracy retry — bail now
+    // rather than making the user wait through a second timeout (notably on iOS).
+    if (code === 'denied' || code === 'unsupported') throw e;
+    fix = await requestPosition({ enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }, 18000);
   }
 
   cacheLocation(fix.lat, fix.lng);
