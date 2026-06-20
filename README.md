@@ -14,7 +14,7 @@ Scan this QR code from the Even Hub app to load Wondereye on your glasses.
 
 ## Setting Your Location
 
-The Even G2 SDK (v0.0.7) does not expose a location API — calling any geolocation method inside the EvenHub WebView crashes the glasses at the native level. To work around this, Wondereye uses a two-step flow to share your phone's GPS with the glasses:
+The Even G2 SDK (v0.0.10) does not expose a location API — calling any geolocation method inside the EvenHub WebView crashes the glasses at the native level. To work around this, Wondereye uses a two-step flow to share your phone's GPS with the glasses:
 
 1. **Open Wondereye on your glasses** via the QR code above. The phone screen (in the Even Hub app) will display a URL like `wondereye.app/?uid=XXXXXXXX` along with a **Copy Link** button.
 2. **Copy the link and open it in your phone's browser** (Safari or Chrome — not inside Even Hub). You'll see a "Set Your Location" panel.
