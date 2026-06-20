@@ -20,7 +20,6 @@ export interface AppState {
   mode: 'loading' | 'list' | 'reading' | 'error' | 'listening';
   errorMessage?: string;
   city?: string;
-  uid?: number;
   detailText?: string;
   readingPage?: number;
   readingPages?: string[];

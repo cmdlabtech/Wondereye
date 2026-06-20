@@ -87,49 +87,6 @@
       text-decoration: none;
     }
     .github-link:hover { color: #888; }
-
-    /* Location setup panel (shown when ?uid= is in URL) */
-    .setup-panel {
-      margin-top: 2.5rem;
-      padding: 1.5rem;
-      border: 1px solid #222;
-      border-radius: 0.75rem;
-      text-align: left;
-    }
-    .setup-panel h2 {
-      font-size: 1.1rem;
-      font-weight: 600;
-      color: #fff;
-      margin-bottom: 0.5rem;
-    }
-    .setup-panel p {
-      font-size: 0.9rem;
-      color: #777;
-      line-height: 1.6;
-      margin-bottom: 1.25rem;
-    }
-    .locate-btn {
-      display: block;
-      width: 100%;
-      padding: 0.75rem 1rem;
-      background: #fff;
-      color: #000;
-      border: none;
-      border-radius: 0.5rem;
-      font-size: 1rem;
-      font-weight: 600;
-      cursor: pointer;
-    }
-    .locate-btn:disabled { opacity: 0.4; cursor: default; }
-    .locate-msg {
-      margin-top: 0.75rem;
-      font-size: 0.875rem;
-      color: #aaa;
-      text-align: center;
-      min-height: 1.4em;
-    }
-    .locate-msg.success { color: #4ade80; }
-    .locate-msg.error { color: #f87171; }
   </style>
 </head>
 <body>
@@ -147,15 +104,6 @@
       <br>
       <a class="github-link" href="https://github.com/cmdlabtech/Wondereye" target="_blank" rel="noopener">View source on GitHub</a>
     </div>
-
-    <div class="setup-panel" id="setup-panel" style="display:none">
-      <h2>Set Your Location</h2>
-      <p>Tap the button below to share your current location with Wondereye on your glasses.</p>
-      <button class="locate-btn" id="locate-btn">Use My Location</button>
-      <p class="locate-msg" id="locate-msg"></p>
-    </div>
   </div>
-
-  <script src="/location-setup.js"></script>
 </body>
 </html>

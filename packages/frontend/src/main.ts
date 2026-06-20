@@ -1,8 +1,8 @@
 import { initBridge } from './bridge';
 import { getBridge } from './bridge';
-import { getCurrentPosition, LocationError } from './geo';
-import { fetchLandmarks, fetchUserLocation } from './api';
-import { renderStartup, renderLoading, renderList, renderError, renderReadingPage, renderSetupNotice } from './renderer';
+import { getCurrentPosition, getCachedLocation, LocationError } from './geo';
+import { fetchLandmarks } from './api';
+import { renderStartup, renderLoading, renderList, renderError, renderReadingPage } from './renderer';
 import { setupEventHandlers } from './events';
 import { initIMU } from './imu';
 import { loadHistory } from './history';
@@ -36,17 +36,6 @@ function setPhoneLocationStatus(text: string, active = false) {
   const el = document.getElementById('location-status');
   if (el) el.textContent = text;
   setPhoneDot('location-dot', active ? 'active' : 'off');
-}
-
-function showPhoneSetupLink(uid: number) {
-  const section = document.getElementById('setup-section');
-  const urlBox = document.getElementById('setup-url');
-  if (!section || !urlBox) return;
-  const url = `${window.location.origin}/?uid=${uid}`;
-  urlBox.textContent = url;
-  // Expose to the inline copy script
-  (window as any)._setupUrl = url;
-  section.style.display = 'block';
 }
 
 function renderPhoneHistory(entries: HistoryEntry[]): void {
@@ -107,19 +96,22 @@ async function getLocation(): Promise<{ lat: number; lng: number }> {
     return { lat: paramLat, lng: paramLng };
   }
 
-  // Try location stored via the homepage (uid-based)
-  if (state.uid) {
-    const stored = await fetchUserLocation(state.uid);
-    if (stored) return stored;
-  }
-
+  // Primary: on-glasses device geolocation (caches the fix on success).
   try {
     return await getCurrentPosition();
   } catch (e) {
     const locErr = e as LocationError;
-    console.warn('[geo] location failed, using Prague fallback:', locErr.code, locErr.message);
-    return { lat: FALLBACK_LAT, lng: FALLBACK_LNG };
+    console.warn('[geo] device location failed:', locErr.code, locErr.message);
   }
+
+  // Fallback: last successfully cached fix, then Prague.
+  const cached = getCachedLocation();
+  if (cached) {
+    console.warn('[geo] using last cached location');
+    return cached;
+  }
+  console.warn('[geo] no cached location, using Prague fallback');
+  return { lat: FALLBACK_LAT, lng: FALLBACK_LNG };
 }
 
 async function loadLandmarks(): Promise<void> {
@@ -234,24 +226,6 @@ async function main(): Promise<void> {
     // SDK requires createStartUpPageContainer called exactly once, before any rebuildPageContainer.
     await renderStartup();
 
-    // Resolve Even account uid with a timeout — getUserInfo can hang or return uid=0
-    // on new/test accounts. Never redirect based on this result.
-    let resolvedUid: number | undefined;
-    try {
-      const user = await Promise.race([
-        getBridge().getUserInfo(),
-        new Promise<null>(resolve => setTimeout(() => resolve(null), 2000)),
-      ]);
-      if (user?.uid) resolvedUid = user.uid;
-    } catch (e) {
-      console.warn('[app] getUserInfo failed:', e);
-    }
-
-    if (resolvedUid) {
-      state.uid = resolvedUid;
-      showPhoneSetupLink(resolvedUid);
-    }
-
     // Load and display landmark visit history on the phone companion UI
     loadHistory(getBridge()).then(renderPhoneHistory).catch(() => {});
 
@@ -272,17 +246,10 @@ async function main(): Promise<void> {
       () => loadHistory(getBridge()).then(renderPhoneHistory).catch(() => {}),
     );
 
-    // Check if user has set up their location via the phone bridge.
-    // If not, show a first-time setup notice on the glasses instead of jumping
-    // straight to landmarks. Tap on the glasses will trigger loadLandmarks
-    // (mode='error' reuses the existing tap-to-retry handler in events.ts).
-    const hasStoredLocation = resolvedUid ? await fetchUserLocation(resolvedUid) : null;
-    if (!hasStoredLocation) {
-      state.mode = 'error';
-      await renderSetupNotice(resolvedUid);
-    } else {
-      await loadLandmarks();
-    }
+    // Location now comes directly from the device, so load landmarks straight away.
+    // If device location is denied/unavailable, getLocation() falls back to the
+    // last cached fix or Prague, so this always proceeds.
+    await loadLandmarks();
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Unknown error';
     console.error('[app] main error:', msg, error);

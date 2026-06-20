@@ -109,8 +109,27 @@
     </li>
   </ul>
 
+  <p class="section-label" style="margin-top:24px">Device Location</p>
+  <ul class="option-list" id="geo-list">
+    <li data-value="on" onclick="selectGeo(this)">
+      <span class="indicator"></span>
+      <div>
+        <div class="option-title">On</div>
+        <div class="option-sub">Use your glasses' location to find nearby landmarks</div>
+      </div>
+    </li>
+    <li data-value="off" onclick="selectGeo(this)">
+      <span class="indicator"></span>
+      <div>
+        <div class="option-title">Off</div>
+        <div class="option-sub">Use last known location only</div>
+      </div>
+    </li>
+  </ul>
+
   <script>
     const KEY = 'wondereye-units';
+    const GEO_KEY = 'wondereye-geo';
 
     function selectUnit(el) {
       document.querySelectorAll('#units-list li').forEach(li => li.classList.remove('selected'));
@@ -118,10 +137,20 @@
       localStorage.setItem(KEY, el.dataset.value);
     }
 
-    // Restore saved preference on load
+    function selectGeo(el) {
+      document.querySelectorAll('#geo-list li').forEach(li => li.classList.remove('selected'));
+      el.classList.add('selected');
+      localStorage.setItem(GEO_KEY, el.dataset.value);
+    }
+
+    // Restore saved preferences on load
     const saved = localStorage.getItem(KEY) || 'imperial';
-    const match = document.querySelector(`[data-value="${saved}"]`);
+    const match = document.querySelector(`#units-list [data-value="${saved}"]`);
     if (match) match.classList.add('selected');
+
+    const savedGeo = localStorage.getItem(GEO_KEY) || 'on';
+    const geoMatch = document.querySelector(`#geo-list [data-value="${savedGeo}"]`);
+    if (geoMatch) geoMatch.classList.add('selected');
   </script>
 </body>
 </html>
