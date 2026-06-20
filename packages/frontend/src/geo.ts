@@ -107,13 +107,13 @@ export async function getCurrentPosition(): Promise<{ lat: number; lng: number }
   // WebView call can't stall us indefinitely.
   let fix: { lat: number; lng: number };
   try {
-    fix = await requestPosition({ enableHighAccuracy: true, timeout: 20000, maximumAge: 60000 }, 23000);
+    fix = await requestPosition({ enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }, 10000);
   } catch (e) {
     const code = (e as LocationError).code;
     // A denied/unsupported result won't change on a low-accuracy retry — bail now
     // rather than making the user wait through a second timeout (notably on iOS).
     if (code === 'denied' || code === 'unsupported') throw e;
-    fix = await requestPosition({ enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }, 18000);
+    fix = await requestPosition({ enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 }, 7000);
   }
 
   cacheLocation(fix.lat, fix.lng);

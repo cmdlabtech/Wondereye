@@ -58,7 +58,15 @@ app.use('/*', async (c, next) => {
   }
   const origins = allowed.split(',').map((o) => o.trim());
   const middleware = cors({
-    origin: (reqOrigin) => origins.includes(reqOrigin) ? reqOrigin : '',
+    origin: (reqOrigin) => {
+      // null origin = file/WebView with no origin. Loopback = EvenHub serves the
+      // installed EHPK from http://127.0.0.1:<random port>, so the origin's port
+      // varies per launch and must be matched by pattern. Neither can be forged
+      // from a normal page on the public web, and this API is public + read-only.
+      if (!reqOrigin || reqOrigin === 'null') return '*';
+      if (/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(reqOrigin)) return reqOrigin;
+      return origins.includes(reqOrigin) ? reqOrigin : '';
+    },
     allowMethods: ['GET', 'POST', 'OPTIONS'],
   });
   return middleware(c, next);

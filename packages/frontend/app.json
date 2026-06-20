@@ -1,7 +1,7 @@
 {
   "package_id": "app.wondereye",
   "edition": "202601",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "min_sdk_version": "0.0.9",
   "min_app_version": "0.1.0",
   "name": "Wondereye",
@@ -13,5 +13,5 @@
     { "name": "network", "desc": "Fetch landmark data from the Wondereye API" },
     { "name": "location", "desc": "Find landmarks near your current position" }
   ],
-  "entrypoint": "app.html"
+  "entrypoint": "index.html"
 }
