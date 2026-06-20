@@ -1,4 +1,4 @@
-import { EvenAppBridge } from '@evenrealities/even_hub_sdk';
+import { getGeoEnabled } from './geo-settings';
 
 export type LocationError =
   | { code: 'unsupported'; message: string }
@@ -6,88 +6,116 @@ export type LocationError =
   | { code: 'unavailable'; message: string }
   | { code: 'timeout'; message: string };
 
-const LOCATION_CACHE_KEY = 'wondereye-location';
-const LOCATION_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+const CACHE_KEY = 'wondereye-last-location';
 
-export interface CachedLocation {
+interface CachedFix {
   lat: number;
   lng: number;
-  timestamp: number;
+  ts: number;
 }
 
 /**
- * Get cached location from glasses storage.
- * Returns null if no cache exists or cache has expired.
+ * Return the last successfully obtained position, if any.
+ * Used as a fallback when geolocation is disabled or fails so a single good
+ * fix keeps the app usable across launches.
  */
-export async function getCachedLocation(bridge: EvenAppBridge): Promise<CachedLocation | null> {
+export function getCachedLocation(): { lat: number; lng: number } | null {
   try {
-    const raw = await bridge.getLocalStorage(LOCATION_CACHE_KEY);
+    const raw = localStorage.getItem(CACHE_KEY);
     if (!raw) return null;
-
-    const cached: CachedLocation = JSON.parse(raw);
-    
-    // Check if cache has expired (7 days)
-    const now = Date.now();
-    if (now - cached.timestamp > LOCATION_CACHE_TTL) {
-      console.log('[geo] location cache expired');
-      return null;
+    const fix = JSON.parse(raw) as CachedFix;
+    if (typeof fix.lat === 'number' && typeof fix.lng === 'number') {
+      return { lat: fix.lat, lng: fix.lng };
     }
-
-    console.log('[geo] using cached location');
-    return cached;
-  } catch (err) {
-    console.warn('[geo] getCachedLocation failed:', err);
-    return null;
+  } catch {
+    // ignore corrupt cache
   }
+  return null;
 }
 
-/**
- * Cache location on glasses storage.
- */
-export async function cacheLocation(bridge: EvenAppBridge, lat: number, lng: number): Promise<void> {
-  // Validate coordinates
-  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-    console.warn('[geo] invalid coordinates, not caching:', lat, lng);
-    return;
-  }
-
+function cacheLocation(lat: number, lng: number): void {
   try {
-    const cached: CachedLocation = {
-      lat,
-      lng,
-      timestamp: Date.now(),
-    };
-    await bridge.setLocalStorage(LOCATION_CACHE_KEY, JSON.stringify(cached));
-    console.log('[geo] location cached');
-  } catch (err) {
-    console.warn('[geo] cacheLocation failed:', err);
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ lat, lng, ts: Date.now() } as CachedFix));
+  } catch {
+    // ignore quota / storage errors
   }
 }
 
-/**
- * Clear cached location from glasses storage.
- */
-export async function clearCachedLocation(bridge: EvenAppBridge): Promise<void> {
-  try {
-    await bridge.setLocalStorage(LOCATION_CACHE_KEY, '');
-    console.log('[geo] location cache cleared');
-  } catch (err) {
-    console.warn('[geo] clearCachedLocation failed:', err);
-  }
+function requestPosition(opts: PositionOptions, hardTimeoutMs: number): Promise<{ lat: number; lng: number }> {
+  return new Promise((resolve, reject) => {
+    // Outer guard: on some Android WebView builds (when the host app doesn't
+    // wire up onGeolocationPermissionsShowPrompt) getCurrentPosition never fires
+    // ANY callback — not even the W3C `timeout` error — and would otherwise hang
+    // loadLandmarks() at "Getting location…" forever. This ceiling guarantees we
+    // always settle so callers can fall back to the cached fix or Prague.
+    let settled = false;
+    const guard = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject({ code: 'timeout', message: 'Location request timed out.' } as LocationError);
+    }, hardTimeoutMs);
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(guard);
+        resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+      },
+      (err) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(guard);
+        // PositionError.code: 1=denied, 2=unavailable (position), 3=timeout
+        let mapped: LocationError;
+        if (err.code === 1) {
+          mapped = { code: 'denied', message: 'Location permission denied.' };
+        } else if (err.code === 3) {
+          mapped = { code: 'timeout', message: 'Location request timed out.' };
+        } else {
+          mapped = { code: 'unavailable', message: 'Location unavailable.' };
+        }
+        reject(mapped);
+      },
+      opts,
+    );
+  });
 }
 
 /**
- * Get current position.
+ * Get the current position via the Even Hub WebView's browser geolocation.
  *
- * Both navigator.geolocation and bridge.callEvenApp('getLocation') crash
- * the Even G2 glasses at the native level (not catchable in JS).
- * We skip all location APIs in the WebView and rely on the fallback
- * coordinates in main.ts (Prague) until a safe location method is found.
+ * This requires the `location` permission in app.json and only works when the
+ * app runs as a formal Hub plugin (QR sideload returns PERMISSION_DENIED).
+ *
+ * On success the fix is cached so it survives later failures/relaunches.
+ * If the kill-switch (settings toggle) is off, throws `denied` immediately so
+ * callers fall back to the cached fix or the Prague fallback.
  */
 export async function getCurrentPosition(): Promise<{ lat: number; lng: number }> {
-  const err: LocationError = {
-    code: 'unavailable',
-    message: 'Location unavailable.',
-  };
-  throw err;
+  if (!getGeoEnabled()) {
+    throw { code: 'denied', message: 'Device location is turned off in settings.' } as LocationError;
+  }
+
+  if (!('geolocation' in navigator)) {
+    throw { code: 'unsupported', message: 'Geolocation is not supported.' } as LocationError;
+  }
+
+  // Try high-accuracy GPS first, then fall back to a faster low-accuracy fix
+  // (mirrors the two-try pattern proven in the old phone setup flow). Each
+  // attempt has a hard ceiling slightly above its W3C `timeout` so a hung
+  // WebView call can't stall us indefinitely.
+  let fix: { lat: number; lng: number };
+  try {
+    fix = await requestPosition({ enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }, 10000);
+  } catch (e) {
+    const code = (e as LocationError).code;
+    // A denied/unsupported result won't change on a low-accuracy retry — bail now
+    // rather than making the user wait through a second timeout (notably on iOS).
+    if (code === 'denied' || code === 'unsupported') throw e;
+    fix = await requestPosition({ enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 }, 7000);
+  }
+
+  cacheLocation(fix.lat, fix.lng);
+  return fix;
 }

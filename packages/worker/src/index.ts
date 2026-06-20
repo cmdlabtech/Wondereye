@@ -58,7 +58,15 @@ app.use('/*', async (c, next) => {
   }
   const origins = allowed.split(',').map((o) => o.trim());
   const middleware = cors({
-    origin: (reqOrigin) => origins.includes(reqOrigin) ? reqOrigin : '',
+    origin: (reqOrigin) => {
+      // null origin = file/WebView with no origin. Loopback = EvenHub serves the
+      // installed EHPK from http://127.0.0.1:<random port>, so the origin's port
+      // varies per launch and must be matched by pattern. Neither can be forged
+      // from a normal page on the public web, and this API is public + read-only.
+      if (!reqOrigin || reqOrigin === 'null') return '*';
+      if (/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(reqOrigin)) return reqOrigin;
+      return origins.includes(reqOrigin) ? reqOrigin : '';
+    },
     allowMethods: ['GET', 'POST', 'OPTIONS'],
   });
   return middleware(c, next);
@@ -370,55 +378,6 @@ app.post('/api/transcribe', async (c) => {
   return c.json({ matched, query: transcribedText });
 });
 
-async function hashUid(uid: number): Promise<string> {
-  const data = new TextEncoder().encode(uid.toString());
-  const digest = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-app.get('/api/location', async (c) => {
-  const uid = c.req.query('uid');
-  if (!uid || !/^\d+$/.test(uid)) {
-    return c.json({ error: 'uid is required' }, 400);
-  }
-  const key = `user-location:${await hashUid(parseInt(uid, 10))}`;
-  const data = await c.env.LANDMARKS_CACHE.get(key, 'json') as { lat: number; lng: number } | null;
-  if (!data) return c.json({ error: 'Not found' }, 404);
-  return c.json(data);
-});
-
-app.post('/api/location', async (c) => {
-  const origin = c.req.header('origin');
-  const allowedOrigins = (c.env.ALLOWED_ORIGIN || '').split(',').map((o) => o.trim());
-  if (!origin || !allowedOrigins.includes(origin)) {
-    return c.json({ error: 'Forbidden' }, 403);
-  }
-
-  let body: any;
-  try {
-    body = await c.req.json();
-  } catch {
-    return c.json({ error: 'Invalid JSON body' }, 400);
-  }
-
-  const { uid, lat, lng } = body;
-  if (!uid || typeof uid !== 'number' || !Number.isInteger(uid) || uid <= 0) {
-    return c.json({ error: 'uid must be a positive integer' }, 400);
-  }
-  if (typeof lat !== 'number' || typeof lng !== 'number' ||
-      lat < -90 || lat > 90 || lng < -180 || lng > 180 ||
-      !Number.isFinite(lat) || !Number.isFinite(lng)) {
-    return c.json({ error: 'Invalid coordinates' }, 400);
-  }
-
-  const key = `user-location:${await hashUid(uid)}`;
-  await c.env.LANDMARKS_CACHE.put(
-    key,
-    JSON.stringify({ lat, lng }),
-    { expirationTtl: 31536000 } // 1 year
-  );
-  return c.json({ ok: true });
-});
 
 app.get('/api/map', async (c) => {
   const cached = await c.env.LANDMARKS_CACHE.get('map-cache', 'json');

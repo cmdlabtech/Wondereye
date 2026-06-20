@@ -5,7 +5,8 @@
     "dev": "vite",
     "build": "vite build",
     "deploy": "npm run build && wrangler deploy",
-    "pack": "npm run build && evenhub pack app.json dist -o wondereye.ehpk"
+    "build:ehpk": "vite build --base ./ --outDir dist-ehpk",
+    "pack": "npm run build:ehpk && cp dist-ehpk/app.html dist-ehpk/index.html && evenhub pack app.json dist-ehpk -o wondereye.ehpk && rm -rf dist-ehpk"
   },
   "dependencies": {
     "@evenrealities/even_hub_sdk": "^0.0.10",

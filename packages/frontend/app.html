@@ -59,47 +59,6 @@
       font-size: 20px;
     }
 
-    .setup-section {
-      margin-top: 24px;
-      padding-top: 24px;
-      border-top: 1px solid rgba(255,255,255,0.1);
-    }
-
-    .setup-label {
-      font-size: 15px;
-      opacity: 0.45;
-      margin-bottom: 10px;
-    }
-
-    .setup-url-box {
-      padding: 14px 16px;
-      border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 6px;
-      word-break: break-all;
-      font-size: 17px;
-      user-select: text;
-      -webkit-user-select: text;
-      cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-      transition: border-color 0.2s, background 0.2s;
-    }
-
-    .setup-url-box:active {
-      background: rgba(255,255,255,0.06);
-    }
-
-    .setup-url-box.copied {
-      border-color: rgba(255,255,255,0.5);
-      background: rgba(255,255,255,0.08);
-    }
-
-    .setup-hint {
-      font-size: 14px;
-      opacity: 0.35;
-      margin-top: 10px;
-      line-height: 1.5;
-    }
-
     .history-section {
       margin-top: 24px;
       padding-top: 24px;
@@ -218,11 +177,6 @@
     </div>
   </div>
 
-  <div class="setup-section" id="setup-section" style="display:none">
-    <div class="setup-label">Update location from your phone's browser <em>(tap to copy)</em></div>
-    <div class="setup-url-box" id="setup-url"></div>
-  </div>
-
   <div class="units-section">
     <div class="units-label">Units</div>
     <div class="units-toggle">
@@ -235,8 +189,6 @@
     <div class="history-section-label">Recently viewed</div>
     <div id="history-list"></div>
   </div>
-
-  <script src="/app-ui.js"></script>
 
   <script type="module" src="/src/main.ts"></script>
 </body>

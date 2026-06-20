@@ -38,16 +38,6 @@ export async function fetchLandmarks(lat: number, lng: number): Promise<Landmark
     .sort((a, b) => a.distance - b.distance);
 }
 
-export async function fetchUserLocation(uid: number): Promise<{ lat: number; lng: number } | null> {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/location?uid=${uid}`);
-    if (!response.ok) return null;
-    return await response.json();
-  } catch {
-    return null;
-  }
-}
-
 export async function fetchLandmarkDetail(name: string, units: 'imperial' | 'metric' = 'imperial'): Promise<string> {
   const response = await fetch(`${API_BASE_URL}/api/landmark-detail`, {
     method: 'POST',
