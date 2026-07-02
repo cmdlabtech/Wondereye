@@ -96,7 +96,7 @@ async function getLocation(): Promise<{ lat: number; lng: number }> {
     return { lat: paramLat, lng: paramLng };
   }
 
-  // Primary: on-glasses device geolocation (caches the fix on success).
+  // Primary: phone location via the SDK bridge (caches the fix on success).
   try {
     return await getCurrentPosition();
   } catch (e) {

@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.5.0 — 2026-07-02
+
+- Real device location via the official Even Hub SDK 0.0.11 `getAppLocation` API — the phone's GPS fix is delivered through the bridge, replacing the blocked WebView geolocation
+- Landmarks now load for your actual surroundings; cached-fix and Prague fallbacks retained for offline/denied cases
+- Requires Even app with SDK 0.0.11 support (`min_sdk_version` bumped)
+
 ## v1.3.5 — 2026-04-06
 
 - Compass direction (N, NE, E, SE…) to the selected landmark shown in the list footer

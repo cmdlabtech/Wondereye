@@ -32,7 +32,12 @@ export async function queryOverpass(
       response = await fetch(endpoint, {
         method: 'POST',
         body: `data=${encodeURIComponent(query)}`,
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          // Overpass instances require an identifying UA per OSM usage policy
+          // (overpass-api.de returns 406 without one)
+          'User-Agent': 'Wondereye/1.5.0 (https://wondereye.app)',
+        },
         signal: controller.signal,
       });
     } catch {

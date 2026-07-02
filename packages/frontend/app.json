@@ -1,8 +1,8 @@
 {
   "package_id": "app.wondereye",
   "edition": "202601",
-  "version": "1.4.1",
-  "min_sdk_version": "0.0.9",
+  "version": "1.5.0",
+  "min_sdk_version": "0.0.11",
   "min_app_version": "0.1.0",
   "name": "Wondereye",
   "tagline": "Look out, not down. Discover landmarks through your glasses.",
@@ -10,7 +10,7 @@
   "author": "cmdlabtech",
   "supported_languages": ["en"],
   "permissions": [
-    { "name": "network", "desc": "Fetch landmark data from the Wondereye API" },
+    { "name": "network", "desc": "Fetch landmark data from the Wondereye API", "whitelist": ["https://api.wondereye.app", "https://nominatim.openstreetmap.org"] },
     { "name": "location", "desc": "Find landmarks near your current position" }
   ],
   "entrypoint": "index.html"

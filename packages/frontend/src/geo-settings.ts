@@ -1,6 +1,6 @@
-// Kill-switch for on-glasses geolocation. Mirrors units.ts.
-// When 'off', the app never calls navigator.geolocation and falls back to the
-// last cached fix (or Prague) — a fast escape hatch if device GPS misbehaves.
+// Kill-switch for device location. Mirrors units.ts.
+// When 'off', the app never calls the SDK's getAppLocation and falls back to
+// the last cached fix (or Prague) — a fast escape hatch if location misbehaves.
 
 const KEY = 'wondereye-geo';
 
