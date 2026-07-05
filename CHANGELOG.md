@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.6.0 — 2026-07-03
+
+- Voice search: tap the "[ Voice Search ]" row in the list to speak a landmark name or ask "what am I looking at?" — declares the `g2-microphone` permission
+- Double-tap on the list or error view opens the system exit dialog (`shutDownPageContainer(1)`), per the official submission guidelines; hardware is released in the `SYSTEM_EXIT_EVENT` handler after the user confirms
+- "[ Refresh ]" action row at the end of the landmark list re-scans the area
+- IMU (compass) reporting is disabled when the app goes to the background or exits, re-enabled on return; the current view re-renders on foreground-enter once landmarks are loaded
+- EHPK bundle no longer ships the phone-web-only homepage and map pages, removing non-whitelisted URLs (Leaflet/CARTO/OSM) flagged by store review
+- Settings page re-declared in app.json so the units toggle is reachable from EvenHub
+- Bridge init falls back to the SDK singleton again when the ready event never fires, with a clearer error if the glasses are truly disconnected
+
 ## v1.5.0 — 2026-07-02
 
 - Real device location via the official Even Hub SDK 0.0.11 `getAppLocation` API — the phone's GPS fix is delivered through the bridge, replacing the blocked WebView geolocation

@@ -221,18 +221,28 @@ export async function renderLoading(message = 'Finding nearby landmarks...'): Pr
 // NAME_COL_WIDTH is 511px. At ~12px/char for accented European text, 42 chars ≈ 504px — safe margin.
 const LIST_NAME_TRUNCATE = 42;
 
+// Action rows appended after the landmarks (see LIST_ACTION_ROWS in events.ts)
+const LIST_ACTION_LABELS = ['[ Voice Search ]', '[ Refresh ]'];
+
 function formatListColumns(
   landmarks: Landmark[],
   selectedIndex: number,
   compassHighlight?: number | null,
 ): { names: string; dists: string } {
+  const total = landmarks.length + LIST_ACTION_LABELS.length;
   const start = Math.max(0, selectedIndex - (VISIBLE_LANDMARKS - 1));
-  const end = Math.min(landmarks.length, start + VISIBLE_LANDMARKS);
+  const end = Math.min(total, start + VISIBLE_LANDMARKS);
 
   const nameLines: string[] = [];
   const distLines: string[] = [];
   for (let i = start; i < end; i++) {
     const isSelected = i === selectedIndex;
+    if (i >= landmarks.length) {
+      const prefix = isSelected ? '> ' : '  ';
+      nameLines.push(prefix + LIST_ACTION_LABELS[i - landmarks.length]);
+      distLines.push('');
+      continue;
+    }
     const isCompass = compassHighlight != null && i === compassHighlight;
     const prefix = isSelected && isCompass ? '>*' : isSelected ? '> ' : isCompass ? '* ' : '  ';
     nameLines.push(prefix + truncate(landmarks[i].name, LIST_NAME_TRUNCATE));
@@ -248,7 +258,7 @@ export async function renderList(state: AppState): Promise<void> {
   if (state.userLat != null && state.userLng != null && lm?.lat != null && lm?.lng != null) {
     dirLabel = cardinalDirection(bearingTo(state.userLat, state.userLng, lm.lat, lm.lng));
   }
-  const leftText = state.city || 'Scroll: browse  Tap: details';
+  const leftText = state.city || 'Tap: open  Dbl: exit';
   const footerText = dirLabel ? footerBoth(leftText, dirLabel) : leftText;
   const { names, dists } = formatListColumns(state.landmarks, state.selectedIndex, state.compassHighlight);
 

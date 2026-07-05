@@ -1,7 +1,9 @@
 import { getBridge } from './bridge';
 import { AppState } from './types';
-import { fetchTranscribe } from './api';
-import { renderListening, renderVoiceResult, renderList, renderError } from './renderer';
+import { fetchTranscribe, fetchLandmarkDetail } from './api';
+import { renderListening, renderVoiceResult, renderList, renderError, renderReadingPage, paginateText } from './renderer';
+import { getUnits } from './units';
+import { recordVisit } from './history';
 
 // PCM format assumed for G2 hardware — adjust if device reports differently
 const AUDIO_SAMPLE_RATE = 16000; // Hz
@@ -81,6 +83,34 @@ function clearVoiceTimers(state: AppState): void {
   }
 }
 
+function isCurrentLandmarkQuery(query: string): boolean {
+  const q = query.toLowerCase();
+  return (
+    q.includes('looking at') ||
+    q.includes('what is this') ||
+    q.includes("what's this") ||
+    q.includes('what am i seeing') ||
+    q.includes('tell me about this') ||
+    q.includes('what is here') ||
+    q.includes('what are we looking at') ||
+    q.includes('what is in front')
+  );
+}
+
+// render=false is for lifecycle handlers (background/exit) where drawing to the
+// glasses would be wasted or race with the OS teardown.
+export function cancelVoiceRecording(state: AppState, render = true): void {
+  if (state.mode !== 'listening') return;
+  clearVoiceTimers(state);
+  state.voiceBuffer = [];
+  state.voiceSilenceAccum = 0;
+  getBridge().audioControl(false).catch((err: unknown) => {
+    console.warn('[voice] audioControl(false) on cancel failed:', err);
+  });
+  state.mode = 'list';
+  if (render) renderList(state).catch(() => {});
+}
+
 export function startVoiceRecording(state: AppState): void {
   if (state.mode === 'listening') return; // already recording
   state.mode = 'listening';
@@ -127,6 +157,27 @@ export async function stopVoiceRecording(state: AppState): Promise<void> {
       if (idx >= 0) state.selectedIndex = idx;
       state.mode = 'list';
       await renderList(state);
+    } else if (result.query && isCurrentLandmarkQuery(result.query)) {
+      // "What am I looking at?" → open the currently selected landmark and auto-load detail
+      const landmark = state.landmarks[state.selectedIndex];
+      if (!landmark) {
+        state.mode = 'list';
+        renderList(state).catch(() => {});
+        return;
+      }
+      state.mode = 'reading';
+      state.detailLoaded = true;
+      state.readingPages = paginateText(landmark.snippet);
+      state.readingPage = 0;
+      await renderReadingPage(landmark, state.readingPages[0], 0, state.readingPages.length, true, true);
+      fetchLandmarkDetail(landmark.name, getUnits()).then(async detail => {
+        if (state.mode !== 'reading' || state.landmarks[state.selectedIndex] !== landmark) return;
+        const combined = landmark.snippet + (detail ? '\n\n' + detail + '\n' : '');
+        state.readingPages = paginateText(combined);
+        state.readingPage = 0;
+        await renderReadingPage(landmark, state.readingPages[0], 0, state.readingPages.length, false, true);
+        if (detail) recordVisit(getBridge(), landmark).catch(() => {});
+      }).catch(() => {});
     } else {
       state.mode = 'list';
       await renderVoiceResult(null);

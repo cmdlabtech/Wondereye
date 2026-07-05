@@ -244,6 +244,7 @@ async function main(): Promise<void> {
       loadLandmarks,
       imuHandler,
       () => loadHistory(getBridge()).then(renderPhoneHistory).catch(() => {}),
+      rerenderCurrentView,
     );
 
     // Location now comes directly from the device, so load landmarks straight away.
