@@ -1,7 +1,7 @@
 {
   "package_id": "app.wondereye",
   "edition": "202601",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "min_sdk_version": "0.0.11",
   "min_app_version": "0.1.0",
   "name": "Wondereye",

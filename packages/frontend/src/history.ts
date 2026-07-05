@@ -25,10 +25,21 @@ export async function recordVisit(bridge: EvenAppBridge, landmark: Landmark): Pr
 
   entries = entries.slice(0, MAX_HISTORY);
 
+  const serialized = JSON.stringify(entries);
+
   try {
-    await bridge.setLocalStorage(HISTORY_KEY, JSON.stringify(entries));
+    await bridge.setLocalStorage(HISTORY_KEY, serialized);
   } catch (err) {
     console.warn('[history] setLocalStorage failed:', err);
+  }
+
+  // Mirror to window.localStorage so the settings WebView (which has no SDK
+  // bridge) can render "My Map Contributions". Same-origin pages share this
+  // store — the same mechanism the units/geo settings rely on.
+  try {
+    window.localStorage.setItem(HISTORY_KEY, serialized);
+  } catch (err) {
+    console.warn('[history] window.localStorage mirror failed:', err);
   }
 }
 
