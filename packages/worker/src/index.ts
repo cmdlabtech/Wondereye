@@ -15,8 +15,21 @@ function cacheKey(lat: number, lng: number, radius: number): string {
   return `landmarks:${lat.toFixed(3)}:${lng.toFixed(3)}:${radius}`;
 }
 
+// Non-Latin names (e.g. CJK) have no a-z0-9 characters, so the ASCII slug
+// collapses to empty and distinct names would otherwise collide on the same
+// key. Fall back to a short deterministic hash of the full name in that case.
+function slugify(name: string): string {
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 100);
+  if (slug) return slug;
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = (hash * 31 + name.charCodeAt(i)) | 0;
+  }
+  return `n${(hash >>> 0).toString(36)}`;
+}
+
 function placeKey(name: string): string {
-  return `place:${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 100)}`;
+  return `place:${slugify(name)}`;
 }
 
 // Permanent map record — no TTL, survives 90-day cache resets.
@@ -24,8 +37,7 @@ function placeKey(name: string): string {
 // (City Hall, Trinity Church, …) get distinct records instead of
 // overwriting each other.
 function mapPlaceKey(name: string, lat: number, lng: number): string {
-  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 100);
-  return `mapplace:${slug}:${lat.toFixed(3)}:${lng.toFixed(3)}`;
+  return `mapplace:${slugify(name)}:${lat.toFixed(3)}:${lng.toFixed(3)}`;
 }
 
 interface MapPlace {
