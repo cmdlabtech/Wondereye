@@ -1,3 +1,6 @@
+import { AppLocationAccuracy } from '@evenrealities/even_hub_sdk';
+import type { AppLocation, AppLocationOptions } from '@evenrealities/even_hub_sdk';
+import { getBridge } from './bridge';
 import { getGeoEnabled } from './geo-settings';
 
 export type LocationError =
@@ -41,52 +44,60 @@ function cacheLocation(lat: number, lng: number): void {
   }
 }
 
-function requestPosition(opts: PositionOptions, hardTimeoutMs: number): Promise<{ lat: number; lng: number }> {
-  return new Promise((resolve, reject) => {
-    // Outer guard: on some Android WebView builds (when the host app doesn't
-    // wire up onGeolocationPermissionsShowPrompt) getCurrentPosition never fires
-    // ANY callback — not even the W3C `timeout` error — and would otherwise hang
-    // loadLandmarks() at "Getting location…" forever. This ceiling guarantees we
-    // always settle so callers can fall back to the cached fix or Prague.
-    let settled = false;
-    const guard = setTimeout(() => {
-      if (settled) return;
-      settled = true;
+function isValidFix(loc: AppLocation | null): loc is AppLocation {
+  return !!loc
+    && Number.isFinite(loc.latitude) && Number.isFinite(loc.longitude)
+    && loc.latitude >= -90 && loc.latitude <= 90
+    && loc.longitude >= -180 && loc.longitude <= 180
+    // Null Island means an uninitialized fix from the host, not a real position
+    && !(loc.latitude === 0 && loc.longitude === 0);
+}
+
+function requestAppLocation(opts: AppLocationOptions, hardTimeoutMs: number): Promise<{ lat: number; lng: number }> {
+  // Outer guard: on host app versions that predate SDK 0.0.11, or when the
+  // native side never responds, getAppLocation() can hang instead of
+  // rejecting — and would otherwise stall loadLandmarks() at "Getting
+  // location…" forever. This ceiling guarantees we always settle so callers
+  // can fall back to the cached fix or Prague.
+  let guard: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    guard = setTimeout(() => {
       reject({ code: 'timeout', message: 'Location request timed out.' } as LocationError);
     }, hardTimeoutMs);
-
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(guard);
-        resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-      },
-      (err) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(guard);
-        // PositionError.code: 1=denied, 2=unavailable (position), 3=timeout
-        let mapped: LocationError;
-        if (err.code === 1) {
-          mapped = { code: 'denied', message: 'Location permission denied.' };
-        } else if (err.code === 3) {
-          mapped = { code: 'timeout', message: 'Location request timed out.' };
-        } else {
-          mapped = { code: 'unavailable', message: 'Location unavailable.' };
-        }
-        reject(mapped);
-      },
-      opts,
-    );
   });
+
+  const request = getBridge()
+    .getAppLocation(opts)
+    .then((loc) => {
+      if (!isValidFix(loc)) {
+        // Host returned no result (null) or invalid coordinates
+        throw { code: 'unavailable', message: 'Location unavailable.' } as LocationError;
+      }
+      return { lat: loc.latitude, lng: loc.longitude };
+    })
+    .catch((e) => {
+      // Optional chain: a raw bridge can reject with null/undefined
+      if ((e as LocationError)?.code) throw e;
+      // Raw bridge rejection — sniff for a permission denial, otherwise
+      // treat as unavailable (covers hosts without the location method).
+      const msg = e instanceof Error ? e.message : String(e);
+      if (/denied|permission/i.test(msg)) {
+        throw { code: 'denied', message: 'Location permission denied.' } as LocationError;
+      }
+      throw { code: 'unavailable', message: 'Location unavailable.' } as LocationError;
+    });
+
+  return Promise.race([request, timeout]).finally(() => clearTimeout(guard));
 }
 
 /**
- * Get the current position via the Even Hub WebView's browser geolocation.
+ * Get the current position from the phone via the SDK bridge
+ * (`getAppLocation`, added in even_hub_sdk 0.0.11). The G2 glasses have no
+ * GPS; the fix comes from the companion app on the phone. Requires the
+ * `location` permission in app.json.
  *
- * This requires the `location` permission in app.json and only works when the
- * app runs as a formal Hub plugin (QR sideload returns PERMISSION_DENIED).
+ * Never touches `navigator.geolocation` — the EvenHub WebView denies it and
+ * older builds crashed outright.
  *
  * On success the fix is cached so it survives later failures/relaunches.
  * If the kill-switch (settings toggle) is off, throws `denied` immediately so
@@ -97,23 +108,25 @@ export async function getCurrentPosition(): Promise<{ lat: number; lng: number }
     throw { code: 'denied', message: 'Device location is turned off in settings.' } as LocationError;
   }
 
-  if (!('geolocation' in navigator)) {
-    throw { code: 'unsupported', message: 'Geolocation is not supported.' } as LocationError;
+  try {
+    getBridge();
+  } catch {
+    throw { code: 'unsupported', message: 'Even app bridge is not available.' } as LocationError;
   }
 
-  // Try high-accuracy GPS first, then fall back to a faster low-accuracy fix
-  // (mirrors the two-try pattern proven in the old phone setup flow). Each
-  // attempt has a hard ceiling slightly above its W3C `timeout` so a hung
-  // WebView call can't stall us indefinitely.
+  // Try a high-accuracy fix first, then fall back to a faster low-accuracy
+  // one (mirrors the two-try pattern proven in the old phone setup flow).
+  // Each attempt has a hard ceiling slightly above its requested timeout so
+  // a hung native call can't stall us indefinitely.
   let fix: { lat: number; lng: number };
   try {
-    fix = await requestPosition({ enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }, 10000);
+    fix = await requestAppLocation({ accuracy: AppLocationAccuracy.High, timeoutMs: 8000 }, 10000);
   } catch (e) {
-    const code = (e as LocationError).code;
+    const code = (e as LocationError)?.code;
     // A denied/unsupported result won't change on a low-accuracy retry — bail now
-    // rather than making the user wait through a second timeout (notably on iOS).
+    // rather than making the user wait through a second timeout.
     if (code === 'denied' || code === 'unsupported') throw e;
-    fix = await requestPosition({ enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 }, 7000);
+    fix = await requestAppLocation({ accuracy: AppLocationAccuracy.Low, timeoutMs: 5000 }, 7000);
   }
 
   cacheLocation(fix.lat, fix.lng);
