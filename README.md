@@ -1,6 +1,9 @@
 # Wondereye
 
-Discover nearby landmarks through your Even G2 smart glasses. Wondereye uses your location to find points of interest via OpenStreetMap, then generates concise descriptions powered by Grok — displayed directly on the glasses.
+Discover nearby landmarks through your Even G2 smart glasses. Wondereye finds points of interest around you via OpenStreetMap, generates concise descriptions powered by Grok, and shows them right on your display — ranked by distance and significance.
+
+- **Homepage:** https://wondereye.app
+- **Community map:** https://wondereye.app/map
 
 ## Try It on Your Glasses
 
@@ -12,27 +15,40 @@ Scan this QR code from the Even Hub app to load Wondereye on your glasses.
   <a href="https://wondereye.app/app.html">wondereye.app/app.html</a>
 </p>
 
-## Setting Your Location
+## Features
 
-The Even G2 SDK (v0.0.10) does not expose a location API — calling any geolocation method inside the EvenHub WebView crashes the glasses at the native level. To work around this, Wondereye uses a two-step flow to share your phone's GPS with the glasses:
+- **Automatic landmark detection** — up to 5 nearby landmarks from real-world OpenStreetMap data, ranked by distance and significance
+- **Instant AI snippets**, with full background details on demand, powered by Grok
+- **Compass direction and distance** to each landmark, shown right on the HUD
+- **Voice search** to find a specific landmark hands-free
+- **Adjustable search range** — tighten it for dense city centers or widen it to explore
+- **Community map** — every landmark discovered by the community adds to a shared world map at [wondereye.app/map](https://wondereye.app/map); view your own contributions in the app
+- **Recently viewed** landmarks saved for later
+- **Imperial or metric** units, your choice
 
-1. **Open Wondereye on your glasses** via the QR code above. The phone screen (in the Even Hub app) will display a URL like `wondereye.app/?uid=XXXXXXXX` along with a **Copy Link** button.
-2. **Copy the link and open it in your phone's browser** (Safari or Chrome — not inside Even Hub). You'll see a "Set Your Location" panel.
-3. **Tap "Use My Location"**, allow the location prompt, and wait for the confirmation message.
-4. **Restart Wondereye** on your glasses (double-tap to return to the app list, then reopen it). It will now load landmarks for your current location.
+## Location
 
-You only need to repeat this when your location changes significantly (e.g., traveling to a new city).
-
-> ⚠️ **iPhone / iOS users:** If the "Use My Location" button shows an error, check the iOS **Settings** app:
-> - **Privacy & Security → Location Services** — must be **On**
-> - **Privacy & Security → Location Services → Safari Websites** — set to **"While Using"**
-
-**Privacy note:** Your location is stored server-side keyed to a one-way SHA-256 hash of your Even account ID — the raw ID is never written to storage. The database contains only anonymous hashes paired with approximate coordinates (~110m precision); no name, email, or other personal information is collected or stored anywhere in this system. Your location is used solely to fetch nearby landmarks and is not shared with anyone.
+Wondereye gets your position from your phone through the Even Hub SDK (`getAppLocation`, SDK 0.0.11+) — no manual setup required. If a live fix isn't available yet, it falls back to your last known location, then to a default city. On the simulator you can pass `lat`/`lng` query params to simulate a position.
 
 ## Navigation
 
-- Tap a landmark to read a snippet, then tap again to load full details
-- Double tap to go back from any view
+- **Tap** a landmark to read a snippet, then **tap again** to load full details
+- **Scroll** up/down to move through the list or paginate details
+- **Double-tap** to go back from any view
+
+## Settings
+
+Open Wondereye's settings from the Even Hub app to:
+
+- Set your **search radius**
+- Choose **imperial or metric** units
+- Toggle **device location** on/off
+- View **My Map Contributions** — the landmarks you've discovered
+- **Support the project**
+
+## Privacy
+
+Your location is obtained on-device via the Even Hub SDK and is used **only** to look up nearby landmarks — it is never written to storage. Landmark cache keys are rounded to ~110m precision. No name, email, or other personal information is collected or stored anywhere in this system. See [`packages/worker/src/CLAUDE.md`](packages/worker/src/CLAUDE.md) for the full data/caching rules.
 
 ## Development
 
@@ -41,8 +57,7 @@ You only need to repeat this when your location changes significantly (e.g., tra
 ```bash
 npm install
 
-# Create worker secrets
-# Copy to packages/worker/.dev.vars:
+# Create worker secrets — copy to packages/worker/.dev.vars:
 #   XAI_API_KEY=your-xai-api-key
 #   ALLOWED_ORIGIN=http://192.168.86.100:5173  (use your dev machine IP)
 ```
@@ -84,12 +99,16 @@ npx evenhub-simulator "http://localhost:5173/app.html?lat=48.8566&lng=2.3522"
 
 Pass any `lat`/`lng` query params to simulate a location.
 
+### Packaging for the Even App Store
+
+```bash
+cd packages/frontend && npm run pack   # builds and packs wondereye.ehpk
+```
+
 ## Deployment
 
 ```bash
-npm run deploy
+npm run deploy            # worker + frontend
+npm run deploy:worker     # worker only
+npm run deploy:frontend   # frontend only
 ```
-
-## Roadmap
-
-- **Tunable Search Radius** — Settings toggle to choose between Precise Mode (accurate location + 100-200m radius for focused sightseeing) and Broad Mode (privacy-optimized location + 500m+ radius for general exploration)

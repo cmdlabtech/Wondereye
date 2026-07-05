@@ -21,3 +21,11 @@ test.html
 # Screenshots
 Screenshots/
 glasses_*.png
+
+# OS / editor junk
+Thumbs.db
+desktop.ini
+
+# Local tooling output & internal notes (never publish)
+graphify-out/
+HERMES_HANDOFF.md
