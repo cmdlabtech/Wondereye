@@ -9,7 +9,7 @@ const MIN_RADIUS = 50;
 const CACHE_TTL = 7776000; // 90 days
 const DETAIL_CACHE_TTL = 7776000; // 90 days
 const PLACE_TTL = 7776000; // 90 days — short-term accumulator
-const MAP_CACHE_TTL = 3600; // 1 hour — aggregated /api/map response
+const MAP_CACHE_TTL = 3600; // 1 hour — aggregated /api/map response; expires naturally (writes no longer bust it)
 
 function cacheKey(lat: number, lng: number, radius: number): string {
   return `landmarks:${lat.toFixed(3)}:${lng.toFixed(3)}:${radius}`;
@@ -19,9 +19,35 @@ function placeKey(name: string): string {
   return `place:${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 100)}`;
 }
 
-// Permanent map record — no TTL, survives 90-day cache resets
-function mapPlaceKey(name: string): string {
-  return `mapplace:${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 100)}`;
+// Permanent map record — no TTL, survives 90-day cache resets.
+// Keyed by slug + rounded coordinates so same-named places worldwide
+// (City Hall, Trinity Church, …) get distinct records instead of
+// overwriting each other.
+function mapPlaceKey(name: string, lat: number, lng: number): string {
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 100);
+  return `mapplace:${slug}:${lat.toFixed(3)}:${lng.toFixed(3)}`;
+}
+
+interface MapPlace {
+  name: string;
+  type: string;
+  lat: number;
+  lng: number;
+  snippet: string;
+}
+
+// Write a permanent map record. The full record is duplicated into KV list
+// metadata (1024-byte cap) so /api/map can aggregate from list() pages alone,
+// with no per-key get() — keeping it under the Workers subrequest limit as
+// the dataset grows.
+function putMapPlace(kv: KVNamespace, lm: MapPlace): Promise<void> {
+  if (!Number.isFinite(lm.lat) || !Number.isFinite(lm.lng)) return Promise.resolve();
+  const entry: MapPlace = { name: lm.name, type: lm.type, lat: lm.lat, lng: lm.lng, snippet: lm.snippet };
+  const metadata: MapPlace = { ...entry };
+  while (new TextEncoder().encode(JSON.stringify(metadata)).length > 1000 && metadata.snippet.length > 0) {
+    metadata.snippet = metadata.snippet.slice(0, Math.max(0, metadata.snippet.length - 50)).trim();
+  }
+  return kv.put(mapPlaceKey(lm.name, lm.lat, lm.lng), JSON.stringify(entry), { metadata });
 }
 
 const RATE_LIMIT_WINDOW = 60_000; // 1 minute
@@ -121,35 +147,29 @@ app.post('/api/landmarks', async (c) => {
             const missing = response.landmarks.filter((_, i) => existing[i] === null);
             if (missing.length === 0) return;
             const pois = await queryOverpass(safeLat, safeLng, radius);
-            await Promise.all([
-              ...missing.flatMap(lm => {
+            await Promise.all(
+              missing.flatMap(lm => {
                 const poi = pois.find(p => p.name.toLowerCase() === lm.name.toLowerCase());
                 if (!poi) return [];
-                const entry = JSON.stringify({ name: lm.name, type: lm.type, lat: poi.lat, lng: poi.lng, snippet: lm.snippet });
+                const place = { name: lm.name, type: lm.type, lat: poi.lat, lng: poi.lng, snippet: lm.snippet };
                 return [
-                  c.env.LANDMARKS_CACHE.put(placeKey(lm.name), entry, { expirationTtl: PLACE_TTL }),
-                  c.env.LANDMARKS_CACHE.put(mapPlaceKey(lm.name), entry),
+                  c.env.LANDMARKS_CACHE.put(placeKey(lm.name), JSON.stringify(place), { expirationTtl: PLACE_TTL }),
+                  putMapPlace(c.env.LANDMARKS_CACHE, place),
                 ];
-              }),
-              c.env.LANDMARKS_CACHE.delete('map-cache'),
-            ]);
+              })
+            );
           })().catch(() => {})
         );
       } else {
         // Cached data has coordinates — backfill mapplace: if missing (one read as proxy for all)
         c.executionCtx.waitUntil(
           (async () => {
-            const exists = await c.env.LANDMARKS_CACHE.get(mapPlaceKey(response.landmarks[0].name));
+            const first = response.landmarks[0];
+            const exists = await c.env.LANDMARKS_CACHE.get(mapPlaceKey(first.name, first.lat, first.lng));
             if (exists) return;
-            await Promise.all([
-              ...response.landmarks.map(lm =>
-                c.env.LANDMARKS_CACHE.put(
-                  mapPlaceKey(lm.name),
-                  JSON.stringify({ name: lm.name, type: lm.type, lat: lm.lat, lng: lm.lng, snippet: lm.snippet })
-                )
-              ),
-              c.env.LANDMARKS_CACHE.delete('map-cache'),
-            ]);
+            await Promise.all(
+              response.landmarks.map(lm => putMapPlace(c.env.LANDMARKS_CACHE, lm))
+            );
           })().catch(() => {})
         );
       }
@@ -179,12 +199,11 @@ app.post('/api/landmarks', async (c) => {
     c.executionCtx.waitUntil(
       Promise.all([
         c.env.LANDMARKS_CACHE.put(key, JSON.stringify(response), { expirationTtl: CACHE_TTL }),
-        c.env.LANDMARKS_CACHE.delete('map-cache'),
         ...landmarks.flatMap(lm => {
-          const entry = JSON.stringify({ name: lm.name, type: lm.type, lat: lm.lat, lng: lm.lng, snippet: lm.snippet });
+          const place = { name: lm.name, type: lm.type, lat: lm.lat, lng: lm.lng, snippet: lm.snippet };
           return [
-            c.env.LANDMARKS_CACHE.put(placeKey(lm.name), entry, { expirationTtl: PLACE_TTL }),
-            c.env.LANDMARKS_CACHE.put(mapPlaceKey(lm.name), entry), // no TTL — permanent
+            c.env.LANDMARKS_CACHE.put(placeKey(lm.name), JSON.stringify(place), { expirationTtl: PLACE_TTL }),
+            putMapPlace(c.env.LANDMARKS_CACHE, place), // no TTL — permanent
           ];
         }),
       ])
@@ -379,28 +398,60 @@ app.post('/api/transcribe', async (c) => {
 });
 
 
+// How many legacy (pre-metadata) mapplace: keys to read+migrate per request.
+// Keeps a cold /api/map bounded well under the Workers subrequest cap; any
+// remainder migrates on subsequent cache misses.
+const LEGACY_MIGRATE_LIMIT = 300;
+
 app.get('/api/map', async (c) => {
   const cached = await c.env.LANDMARKS_CACHE.get('map-cache', 'json');
   if (cached) return c.json(cached);
 
-  // Paginate through all mapplace: entries (KV list returns max 1000 per call)
-  const keys: string[] = [];
+  // Paginate through all mapplace: keys (KV list returns max 1000 per call).
+  // The landmark record rides in each key's list metadata, so aggregation
+  // needs no per-key get() and stays flat-cost as the dataset grows.
+  const keys: { name: string; metadata?: MapPlace }[] = [];
   let cursor: string | undefined;
   do {
     const page: any = await c.env.LANDMARKS_CACHE.list({ prefix: 'mapplace:', cursor, limit: 1000 });
-    keys.push(...page.keys.map((k: any) => k.name));
+    keys.push(...page.keys);
     cursor = page.list_complete ? undefined : page.cursor;
   } while (cursor);
 
-  const entries = await Promise.all(keys.map(k => c.env.LANDMARKS_CACHE.get(k, 'json')));
   const seen = new Set<string>();
-  const landmarks = entries.filter((e: any) => {
-    if (!e || !e.name) return false;
-    const key = e.name.toLowerCase().trim();
-    if (seen.has(key)) return false;
-    seen.add(key);
+  const landmarks: MapPlace[] = [];
+  const addLandmark = (e: any): boolean => {
+    if (!e || typeof e.name !== 'string' || !e.name || !Number.isFinite(e.lat) || !Number.isFinite(e.lng)) return false;
+    const dedupeKey = mapPlaceKey(e.name, e.lat, e.lng);
+    if (seen.has(dedupeKey)) return false;
+    seen.add(dedupeKey);
+    landmarks.push({ name: e.name, type: e.type, lat: e.lat, lng: e.lng, snippet: e.snippet });
     return true;
-  });
+  };
+
+  for (const k of keys) {
+    if (k.metadata) addLandmark(k.metadata);
+  }
+
+  // Legacy keys predate list metadata (and location-suffixed key names):
+  // read their values once, fold them in, and rewrite them in the new
+  // format so future cache misses need no per-key reads.
+  const legacyKeys = keys.filter(k => !k.metadata).slice(0, LEGACY_MIGRATE_LIMIT);
+  if (legacyKeys.length > 0) {
+    const legacyValues = await Promise.all(legacyKeys.map(k => c.env.LANDMARKS_CACHE.get(k.name, 'json')));
+    const migrations: Promise<void>[] = [];
+    legacyKeys.forEach((k, i) => {
+      const e: any = legacyValues[i];
+      if (!e || typeof e.name !== 'string' || !Number.isFinite(e.lat) || !Number.isFinite(e.lng)) return;
+      addLandmark(e);
+      migrations.push(putMapPlace(c.env.LANDMARKS_CACHE, e));
+      if (mapPlaceKey(e.name, e.lat, e.lng) !== k.name) {
+        migrations.push(c.env.LANDMARKS_CACHE.delete(k.name));
+      }
+    });
+    c.executionCtx.waitUntil(Promise.all(migrations).catch(() => {}));
+  }
+
   const response = { landmarks };
   c.executionCtx.waitUntil(
     c.env.LANDMARKS_CACHE.put('map-cache', JSON.stringify(response), { expirationTtl: MAP_CACHE_TTL })

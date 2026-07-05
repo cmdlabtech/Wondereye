@@ -1,5 +1,11 @@
 # Changelog
 
+## Worker — 2026-07-04 (map API)
+
+- `/api/map` aggregates landmark records from KV list metadata instead of one `get()` per key — stays under the Workers subrequest cap as the crowdsourced dataset grows; legacy keys are lazily migrated (read once, rewritten with metadata, old key deleted)
+- `mapplace:` records are keyed by name **and** rounded coordinates, so same-named places worldwide (Trinity Church, City Hall, …) no longer overwrite each other on the public map
+- Writes no longer bust `map-cache`; the aggregated map response now simply expires on its 1-hour TTL
+
 ## v1.6.0 — 2026-07-03
 
 - Voice search: tap the "[ Voice Search ]" row in the list to speak a landmark name or ask "what am I looking at?" — declares the `g2-microphone` permission
