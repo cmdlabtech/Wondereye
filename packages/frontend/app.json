@@ -10,10 +10,9 @@
   "author": "cmdlabtech",
   "supported_languages": ["en"],
   "permissions": [
-    { "name": "network", "desc": "Fetch landmark data from the Wondereye API", "whitelist": ["https://api.wondereye.app", "https://nominatim.openstreetmap.org"] },
+    { "name": "network", "desc": "Fetch landmark data from the Wondereye API", "whitelist": ["https://api.wondereye.app", "https://nominatim.openstreetmap.org", "https://wondereye.app", "https://buymeacoffee.com"] },
     { "name": "location", "desc": "Find landmarks near your current position" },
     { "name": "g2-microphone", "desc": "Voice search for landmarks" }
   ],
-  "entrypoint": "index.html",
-  "settings": "settings.html"
+  "entrypoint": "index.html"
 }
