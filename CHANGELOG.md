@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.6.2 — 2026-07-07
+
+- Adjustable search range slider (250 m–2000 m) to control how far Wondereye looks for landmarks
+- "My Map Contributions": see the landmarks you've discovered for the community map
+- Quick link to the community landmark map, plus a "Become a Supporter!" button
+- Settings reorganized with search range at the top
+
+- Even Hub submission review fixes
+
 ## Worker — 2026-07-04 (map API)
 
 - `/api/map` aggregates landmark records from KV list metadata instead of one `get()` per key — stays under the Workers subrequest cap as the crowdsourced dataset grows; legacy keys are lazily migrated (read once, rewritten with metadata, old key deleted)

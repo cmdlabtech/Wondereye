@@ -10,6 +10,8 @@ import { updateCompassHeading } from './compass';
 import { AppState, HistoryEntry } from './types';
 import { reverseGeocode } from './geocode';
 import { getUnits, setUnits } from './units';
+import { getRadius, setRadius, RADIUS_MIN, RADIUS_MAX } from './radius';
+import { getGeoEnabled, setGeoEnabled } from './geo-settings';
 
 const state: AppState = {
   landmarks: [],
@@ -38,52 +40,48 @@ function setPhoneLocationStatus(text: string, active = false) {
   setPhoneDot('location-dot', active ? 'active' : 'off');
 }
 
-function renderPhoneHistory(entries: HistoryEntry[]): void {
-  const section = document.getElementById('history-section');
-  const list = document.getElementById('history-list');
-  if (!section || !list) return;
+function renderContributions(entries: HistoryEntry[]): void {
+  const summary = document.getElementById('contrib-summary');
+  const list = document.getElementById('contrib-list');
+  if (!summary || !list) return;
+
+  list.replaceChildren();
 
   if (entries.length === 0) {
-    section.style.display = 'none';
+    summary.textContent = 'No contributions yet';
+    const empty = document.createElement('div');
+    empty.className = 'contrib-empty';
+    empty.textContent = 'Landmarks you view on your glasses are added to the community map and will appear here.';
+    list.appendChild(empty);
     return;
   }
 
-  const recent = entries.slice(0, 10);
-  list.replaceChildren();
-  for (const entry of recent) {
+  summary.textContent = entries.length === 1
+    ? '1 landmark contributed'
+    : `${entries.length} landmarks contributed`;
+
+  for (const entry of entries) {
     const date = new Date(entry.visitedAt).toLocaleDateString('en', { month: 'short', day: 'numeric' });
-    const snippet = entry.snippet.length > 60 ? entry.snippet.slice(0, 57) + '...' : entry.snippet;
     const type = entry.type.replace(/_/g, ' ');
 
-    const div = document.createElement('div');
-    div.className = 'history-entry';
-
-    const header = document.createElement('div');
-    header.className = 'history-header';
+    const item = document.createElement('div');
+    item.className = 'contrib-item';
 
     const nameSpan = document.createElement('span');
-    nameSpan.className = 'history-name';
+    nameSpan.className = 'contrib-name';
     nameSpan.textContent = entry.name;
 
     const typeSpan = document.createElement('span');
-    typeSpan.className = 'history-type';
+    typeSpan.className = 'contrib-type';
     typeSpan.textContent = type;
 
     const dateSpan = document.createElement('span');
-    dateSpan.className = 'history-date';
+    dateSpan.className = 'contrib-date';
     dateSpan.textContent = date;
 
-    header.append(nameSpan, typeSpan, dateSpan);
-
-    const snippetDiv = document.createElement('div');
-    snippetDiv.className = 'history-snippet';
-    snippetDiv.textContent = snippet;
-
-    div.append(header, snippetDiv);
-    list.appendChild(div);
+    item.append(nameSpan, typeSpan, dateSpan);
+    list.appendChild(item);
   }
-
-  section.style.display = 'block';
 }
 
 async function getLocation(): Promise<{ lat: number; lng: number }> {
@@ -151,7 +149,7 @@ async function loadLandmarks(): Promise<void> {
     await renderList(state);
 
     // Refresh phone history display after each successful landmark load
-    loadHistory(getBridge()).then(renderPhoneHistory).catch(() => {});
+    loadHistory(getBridge()).then(renderContributions).catch(() => {});
   } catch (error) {
     console.error('[app] loadLandmarks error:', error);
     state.mode = 'error';
@@ -186,6 +184,20 @@ async function rerenderCurrentView(): Promise<void> {
   }
 }
 
+function formatRadius(meters: number): string {
+  if (getUnits() === 'metric') {
+    return meters < 1000 ? `${meters} m` : `${(meters / 1000).toFixed(1)} km`;
+  }
+  return meters < 1609
+    ? `${Math.round((meters * 3.28084) / 10) * 10} ft`
+    : `${(meters / 1609.34).toFixed(1)} mi`;
+}
+
+function refreshRadiusLabel(): void {
+  const label = document.getElementById('radius-value');
+  if (label) label.textContent = formatRadius(getRadius());
+}
+
 function initUnitsToggle(): void {
   const imperialBtn = document.getElementById('units-imperial');
   const metricBtn = document.getElementById('units-metric');
@@ -195,6 +207,7 @@ function initUnitsToggle(): void {
     const current = getUnits();
     imperialBtn.classList.toggle('active', current === 'imperial');
     metricBtn.classList.toggle('active', current === 'metric');
+    refreshRadiusLabel(); // radius label is unit-aware
   };
 
   refresh();
@@ -212,9 +225,89 @@ function initUnitsToggle(): void {
   });
 }
 
+function initRadiusControl(): void {
+  const slider = document.getElementById('radius-slider') as HTMLInputElement | null;
+  if (!slider) return;
+
+  slider.min = String(RADIUS_MIN);
+  slider.max = String(RADIUS_MAX);
+  slider.value = String(getRadius());
+  refreshRadiusLabel();
+
+  // Live label while dragging; persist as we go.
+  slider.addEventListener('input', () => {
+    const meters = Math.max(RADIUS_MIN, Math.min(RADIUS_MAX, Number(slider.value) || RADIUS_MAX));
+    setRadius(meters);
+    const label = document.getElementById('radius-value');
+    if (label) label.textContent = formatRadius(meters);
+  });
+
+  // Reload landmarks once the user settles on a value.
+  slider.addEventListener('change', () => {
+    setRadius(Number(slider.value) || RADIUS_MAX);
+    loadLandmarks().catch(() => {});
+  });
+}
+
+function initGeoToggle(): void {
+  const onBtn = document.getElementById('geo-on');
+  const offBtn = document.getElementById('geo-off');
+  if (!onBtn || !offBtn) return;
+
+  const refresh = () => {
+    const enabled = getGeoEnabled();
+    onBtn.classList.toggle('active', enabled);
+    offBtn.classList.toggle('active', !enabled);
+  };
+
+  refresh();
+
+  const set = (enabled: boolean) => {
+    setGeoEnabled(enabled);
+    refresh();
+    loadLandmarks().catch(() => {});
+  };
+
+  onBtn.addEventListener('click', () => set(true));
+  offBtn.addEventListener('click', () => set(false));
+}
+
+// Best-effort: open external links (map, supporter) in the phone's browser.
+// The Even Hub SDK has no "open URL" bridge method, so this relies on the host
+// WebView honoring a new-window request. window.open (from a user gesture) is
+// the most widely supported signal; if the host blocks it we fall through to
+// the anchor's native target="_blank".
+function initExternalLinks(): void {
+  const links = document.querySelectorAll<HTMLAnchorElement>('a[data-external]');
+  links.forEach((link) => {
+    link.addEventListener('click', (e) => {
+      const url = link.href;
+      if (!url) return;
+      const opened = window.open(url, '_blank', 'noopener,noreferrer');
+      if (opened) e.preventDefault(); // avoid a second navigation if it worked
+    });
+  });
+}
+
+function initContribToggle(): void {
+  const toggle = document.getElementById('contrib-toggle');
+  const list = document.getElementById('contrib-list');
+  if (!toggle || !list) return;
+
+  toggle.addEventListener('click', () => {
+    const open = toggle.getAttribute('aria-expanded') === 'true';
+    toggle.setAttribute('aria-expanded', String(!open));
+    (list as HTMLElement).hidden = open;
+  });
+}
+
 async function main(): Promise<void> {
   try {
     initUnitsToggle();
+    initRadiusControl();
+    initGeoToggle();
+    initContribToggle();
+    initExternalLinks();
     setPhoneStatus('Connecting...');
     setPhoneDot('connection-dot', 'loading');
     await initBridge();
@@ -227,7 +320,7 @@ async function main(): Promise<void> {
     await renderStartup();
 
     // Load and display landmark visit history on the phone companion UI
-    loadHistory(getBridge()).then(renderPhoneHistory).catch(() => {});
+    loadHistory(getBridge()).then(renderContributions).catch(() => {});
 
     // Initialize IMU for compass heading tracking
     let imuHandler: ((event: any) => void) | undefined;
@@ -243,7 +336,7 @@ async function main(): Promise<void> {
       state,
       loadLandmarks,
       imuHandler,
-      () => loadHistory(getBridge()).then(renderPhoneHistory).catch(() => {}),
+      () => loadHistory(getBridge()).then(renderContributions).catch(() => {}),
       rerenderCurrentView,
     );
 

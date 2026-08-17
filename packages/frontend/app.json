@@ -1,7 +1,7 @@
 {
   "package_id": "app.wondereye",
   "edition": "202601",
-  "version": "1.6.0",
+  "version": "1.6.2",
   "min_sdk_version": "0.0.11",
   "min_app_version": "0.1.0",
   "name": "Wondereye",
@@ -10,10 +10,9 @@
   "author": "cmdlabtech",
   "supported_languages": ["en"],
   "permissions": [
-    { "name": "network", "desc": "Fetch landmark data from the Wondereye API", "whitelist": ["https://api.wondereye.app", "https://nominatim.openstreetmap.org"] },
+    { "name": "network", "desc": "Fetch landmark data from the Wondereye API", "whitelist": ["https://api.wondereye.app", "https://nominatim.openstreetmap.org", "https://wondereye.app", "https://buymeacoffee.com"] },
     { "name": "location", "desc": "Find landmarks near your current position" },
     { "name": "g2-microphone", "desc": "Voice search for landmarks" }
   ],
-  "entrypoint": "index.html",
-  "settings": "settings.html"
+  "entrypoint": "index.html"
 }
