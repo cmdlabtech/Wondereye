@@ -26,12 +26,12 @@ interface MarkerUserData {
 
 const GLOBE_R = 1;
 const UP = new THREE.Vector3(0, 1, 0);
-const PIN_STEM_H = 0.022;
-const PIN_STEM_R = 0.0036;
-const PIN_SPHERE_R = 0.014;
-const PIN_RING_R = 0.018;
-const PIN_RING_TUBE = 0.0025;
-const CLUSTER_R = 0.038;
+const PIN_STEM_H = 0.012;
+const PIN_STEM_R = 0.00115;
+const PIN_SPHERE_R = 0.006;
+const PIN_RING_R = 0.0074;
+const PIN_RING_TUBE = 0.0007;
+const CLUSTER_R = 0.0108;
 const MIN_DIST = 1.085;
 const MAX_DIST = 3.2;
 const START_LAT = 20;
@@ -97,17 +97,17 @@ function easeInOut(t: number): number {
 
 function cellDegForDistance(dist: number): number {
   const alt = dist - GLOBE_R;
-  if (alt > 1.45) return 18;
-  if (alt > 1.05) return 10;
-  if (alt > 0.72) return 6;
-  if (alt > 0.46) return 3.5;
-  if (alt > 0.28) return 1.8;
-  if (alt > 0.16) return 0.8;
-  return 0.25;
+  if (alt > 1.2) return 14;
+  if (alt > 0.85) return 8;
+  if (alt > 0.55) return 4.5;
+  if (alt > 0.32) return 2.2;
+  if (alt > 0.18) return 1.0;
+  return 0.35;
 }
 
 function markerScaleForDistance(dist: number): number {
-  return THREE.MathUtils.clamp(0.28 + (dist - 1.05) * 0.52, 0.34, 1.22);
+  const t = THREE.MathUtils.inverseLerp(MAX_DIST, MIN_DIST, dist);
+  return THREE.MathUtils.lerp(0.7, 1.12, THREE.MathUtils.clamp(t, 0, 1));
 }
 
 function landmarkPopupHtml(lm: MapLandmark): string {
@@ -138,14 +138,10 @@ function makeLabelTexture(count: number): THREE.CanvasTexture {
   if (ctx) {
     ctx.clearRect(0, 0, size, size);
     ctx.fillStyle = '#ffffff';
-    ctx.strokeStyle = '#14532d';
-    ctx.lineWidth = 8;
-    ctx.font = `700 ${count > 99 ? 48 : 58}px system-ui, sans-serif`;
+    ctx.font = `700 ${count > 99 ? 52 : count > 9 ? 62 : 72}px system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const text = String(count);
-    ctx.strokeText(text, size / 2, size / 2 + 2);
-    ctx.fillText(text, size / 2, size / 2 + 2);
+    ctx.fillText(String(count), size / 2, size / 2 + 2);
   }
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -166,7 +162,7 @@ function init() {
   const mapEl = container;
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xd6e4ec);
+  scene.background = new THREE.Color(0xe8eef2);
 
   const camera = new THREE.PerspectiveCamera(45, 1, 0.05, 20);
   camera.position.copy(latLngToVec(START_LAT, START_LNG, START_DIST));
@@ -175,37 +171,79 @@ function init() {
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.setClearColor(0xd6e4ec, 1);
+  renderer.setClearColor(0xe8eef2, 1);
   mapEl.appendChild(renderer.domElement);
 
-  const ambient = new THREE.AmbientLight(0xffffff, 1.2);
+  const ambient = new THREE.AmbientLight(0xffffff, 0.4);
   scene.add(ambient);
-  // Camera-attached key light: facing hemisphere stays bright, no night side.
-  const key = new THREE.DirectionalLight(0xffffff, 0.38);
-  key.position.set(0.4, 0.25, 1);
-  camera.add(key);
+  const hemi = new THREE.HemisphereLight(0xf4f7fb, 0x8aa3b5, 0.28);
+  scene.add(hemi);
+  const key = new THREE.DirectionalLight(0xffffff, 1.15);
+  key.position.set(2.4, 1.35, 1.6);
+  scene.add(key);
+  const fill = new THREE.DirectionalLight(0xc5d4e2, 0.22);
+  fill.position.set(-1.8, -0.4, -1.2);
+  scene.add(fill);
   scene.add(camera);
 
+  function recolorVoyager(image: CanvasImageSource): HTMLCanvasElement {
+    const src = image as CanvasImageSource & { width: number; height: number };
+    const w = src.width || 1024;
+    const h = src.height || 512;
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return canvas;
+    ctx.drawImage(image, 0, 0, w, h);
+    const img = ctx.getImageData(0, 0, w, h);
+    const d = img.data;
+    // Land #e4d5bc  ocean #9eb6c8
+    for (let i = 0; i < d.length; i += 4) {
+      const r = d[i], g = d[i + 1], b = d[i + 2];
+      const ocean = b > r + 4 || (b > 150 && b >= g);
+      if (ocean) {
+        d[i] = 0x9e; d[i + 1] = 0xb6; d[i + 2] = 0xc8;
+      } else {
+        d[i] = 0xe4; d[i + 1] = 0xd5; d[i + 2] = 0xbc;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    return canvas;
+  }
+
   const texLoader = new THREE.TextureLoader();
-  const earthTex = texLoader.load(earthVoyagerUrl);
+  const earthMat = new THREE.MeshStandardMaterial({
+    color: 0xe4d5bc,
+    roughness: 0.86,
+    metalness: 0.02,
+  });
+  const earthTex = texLoader.load(earthVoyagerUrl, (tex) => {
+    tex.image = recolorVoyager(tex.image);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    tex.minFilter = THREE.LinearMipmapLinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+    tex.needsUpdate = true;
+    earthMat.map = tex;
+    earthMat.color.set(0xffffff);
+    earthMat.needsUpdate = true;
+  });
   earthTex.colorSpace = THREE.SRGBColorSpace;
-  earthTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
-  earthTex.minFilter = THREE.LinearMipmapLinearFilter;
-  earthTex.magFilter = THREE.LinearFilter;
 
   const globe = new THREE.Mesh(
     new THREE.SphereGeometry(GLOBE_R, 96, 64),
-    new THREE.MeshBasicMaterial({ map: earthTex }),
+    earthMat,
   );
   globe.name = 'globe';
   scene.add(globe);
 
   const atmo = new THREE.Mesh(
-    new THREE.SphereGeometry(GLOBE_R * 1.018, 64, 48),
+    new THREE.SphereGeometry(GLOBE_R * 1.012, 64, 48),
     new THREE.MeshBasicMaterial({
-      color: 0xc5d9e8,
+      color: 0xb7cde0,
       transparent: true,
-      opacity: 0.2,
+      opacity: 0.11,
       side: THREE.BackSide,
       depthWrite: false,
     }),
@@ -222,7 +260,6 @@ function init() {
   const sphereGeom = new THREE.SphereGeometry(PIN_SPHERE_R, 18, 14);
   const ringGeom = new THREE.TorusGeometry(PIN_RING_R, PIN_RING_TUBE, 8, 28);
   const clusterGeom = new THREE.SphereGeometry(CLUSTER_R, 24, 16);
-  const clusterRingGeom = new THREE.TorusGeometry(CLUSTER_R * 1.05, PIN_RING_TUBE, 8, 28);
 
   const greenSphereMat = new THREE.MeshPhongMaterial({ color: GREEN, shininess: 45, specular: 0x88cc99 });
   const greenStemMat = new THREE.MeshPhongMaterial({ color: GREEN_STEM, shininess: 18 });
@@ -258,22 +295,19 @@ function init() {
   function makeCluster(lat: number, lng: number, members: MapLandmark[]): THREE.Group {
     const group = new THREE.Group();
     const ball = new THREE.Mesh(clusterGeom, clusterMat);
-    ball.position.y = CLUSTER_R * 0.75;
-    const ring = new THREE.Mesh(clusterRingGeom, whiteRingMat);
-    ring.position.y = ball.position.y;
-    ring.rotation.x = Math.PI / 2;
+    ball.position.y = CLUSTER_R * 0.55;
     let tex = labelTexCache.get(members.length);
     if (!tex) {
       tex = makeLabelTexture(members.length);
       labelTexCache.set(members.length, tex);
     }
-    const label = new THREE.Mesh(
-      new THREE.PlaneGeometry(CLUSTER_R * 1.7, CLUSTER_R * 1.7),
-      new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }),
+    const label = new THREE.Sprite(
+      new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: true, depthWrite: false }),
     );
-    label.position.y = ball.position.y + CLUSTER_R * 0.02;
-    label.rotation.x = -Math.PI / 2;
-    group.add(ball, ring, label);
+    const labelSize = CLUSTER_R * 1.55;
+    label.scale.set(labelSize, labelSize, 1);
+    label.position.y = ball.position.y;
+    group.add(ball, label);
     group.userData = { kind: 'cluster', members, lat, lng } satisfies MarkerUserData;
     placeOnGlobe(group, lat, lng);
     return group;
