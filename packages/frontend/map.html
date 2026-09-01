@@ -8,8 +8,8 @@
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     body {
       font-family: system-ui, -apple-system, sans-serif;
-      background: #fff;
-      color: #1a1a1a;
+      background: #0e1116;
+      color: #eee;
       display: flex;
       flex-direction: column;
       height: 100vh;
@@ -23,21 +23,22 @@
       padding-bottom: 0.75rem;
       padding-left: max(1.25rem, env(safe-area-inset-left));
       padding-right: max(1.25rem, env(safe-area-inset-right));
-      border-bottom: 1px solid #e5e5e5;
+      background: #12141a;
+      border-bottom: 1px solid #23262e;
       flex-shrink: 0;
     }
     header a {
       font-size: 0.85rem;
-      color: #888;
+      color: #eee;
       text-decoration: none;
       display: inline-flex;
       align-items: center;
       min-height: 44px;
     }
-    header a:hover { color: #444; }
+    header a:hover { color: #fff; }
     #count {
       font-size: 0.8rem;
-      color: #888;
+      color: #8b909a;
       white-space: nowrap;
       flex-shrink: 0;
     }
@@ -50,16 +51,16 @@
       width: 100%;
       font: inherit;
       font-size: 0.85rem;
-      color: #1a1a1a;
-      background: #f5f5f5;
-      border: 1px solid #e0e0e0;
+      color: #eee;
+      background: #1c1f26;
+      border: 1px solid #2a2e36;
       border-radius: 999px;
       padding: 0.5rem 0.9rem;
       outline: none;
     }
-    #search::placeholder { color: #999; }
+    #search::placeholder { color: #7a808c; }
     #search:focus {
-      background: #fff;
+      background: #1c1f26;
       border-color: #16a34a;
       box-shadow: 0 0 0 3px rgba(22,163,74,0.15);
     }
@@ -68,13 +69,14 @@
       top: calc(100% + 4px);
       left: 0;
       right: 0;
-      background: #fff;
-      border: 1px solid #e0e0e0;
+      background: #1c1f26;
+      border: 1px solid #2a2e36;
       border-radius: 8px;
-      box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+      box-shadow: 0 6px 16px rgba(0,0,0,0.45);
       max-height: 320px;
       overflow-y: auto;
       z-index: 1000;
+      color: #eee;
     }
     .search-result {
       display: flex;
@@ -83,12 +85,12 @@
       gap: 0.5rem;
       padding: 0.6rem 0.75rem;
       cursor: pointer;
-      border-bottom: 1px solid #f0f0f0;
+      border-bottom: 1px solid #2a2e36;
       font-size: 0.85rem;
     }
     .search-result:last-child { border-bottom: none; }
     .search-result:hover,
-    .search-result.active { background: #f2f2f2; }
+    .search-result.active { background: #262a33; }
     .search-result-name {
       overflow: hidden;
       text-overflow: ellipsis;
@@ -96,25 +98,25 @@
     }
     .search-result-type {
       font-size: 0.68rem;
-      color: #888;
+      color: #8b909a;
       text-transform: uppercase;
       letter-spacing: 0.05em;
       flex-shrink: 0;
     }
     .search-result-location {
       font-style: italic;
-      color: #444;
+      color: #c8ccd4;
     }
     .search-empty {
       padding: 0.6rem 0.75rem;
       font-size: 0.82rem;
-      color: #888;
+      color: #8b909a;
     }
     .map-stage {
       flex: 1;
       min-height: 0;
       position: relative;
-      background: #e8eef2;
+      background: #0e1116;
     }
     #map {
       position: absolute;
@@ -132,15 +134,15 @@
       left: 50%;
       top: 1rem;
       transform: translateX(-50%);
-      background: rgba(255,255,255,0.94);
-      border: 1px solid #e0e0e0;
+      background: rgba(18,20,26,0.92);
+      border: 1px solid #2a2e36;
       border-radius: 999px;
       padding: 0.45rem 0.95rem;
       font-size: 0.82rem;
-      color: #555;
+      color: #c8ccd4;
       pointer-events: none;
       z-index: 8;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.35);
       white-space: nowrap;
     }
     #map-status[hidden] { display: none; }
@@ -149,23 +151,23 @@
       left: max(0.5rem, env(safe-area-inset-left));
       bottom: max(0.4rem, env(safe-area-inset-bottom));
       font-size: 0.65rem;
-      color: #667;
-      background: rgba(255,255,255,0.78);
+      color: #c8ccd4;
+      background: rgba(18,20,26,0.82);
       padding: 0.15rem 0.45rem;
       border-radius: 4px;
       z-index: 7;
       line-height: 1.3;
     }
-    #map-attrib a { color: #556; text-decoration: none; }
+    #map-attrib a { color: #d7dce6; text-decoration: none; }
     #map-attrib a:hover { text-decoration: underline; }
     #map-popup {
       position: absolute;
       z-index: 9;
-      background: #fff;
-      color: #1a1a1a;
-      border: 1px solid #ddd;
+      background: #1c1f26;
+      color: #eee;
+      border: 1px solid #2a2e36;
       border-radius: 6px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.45);
       font-size: 0.85rem;
       width: max-content;
       max-width: min(280px, calc(100vw - 40px));
@@ -179,16 +181,16 @@
       bottom: -6px;
       width: 10px;
       height: 10px;
-      background: #fff;
-      border-right: 1px solid #ddd;
-      border-bottom: 1px solid #ddd;
+      background: #1c1f26;
+      border-right: 1px solid #2a2e36;
+      border-bottom: 1px solid #2a2e36;
       transform: translateX(-50%) rotate(45deg);
     }
     .map-popup-close {
       position: absolute;
       top: 0;
       right: 0;
-      color: #999;
+      color: #9aa0aa;
       width: 44px;
       height: 44px;
       display: flex;
@@ -207,20 +209,20 @@
     }
     .popup-type {
       font-size: 0.7rem;
-      color: #888;
+      color: #8b909a;
       text-transform: uppercase;
       letter-spacing: 0.06em;
     }
     .cl-list { display: flex; flex-direction: column; gap: 2px; }
     .cl-item {
       display: flex; justify-content: space-between; align-items: center;
-      padding: 6px 4px; cursor: pointer; border-bottom: 1px solid #eee;
+      padding: 6px 4px; cursor: pointer; border-bottom: 1px solid #2a2e36;
       font-size: 0.82rem;
     }
     .cl-item:last-child { border-bottom: none; }
-    .cl-item:hover { background: #f2f2f2; border-radius: 4px; }
+    .cl-item:hover { background: #262a33; border-radius: 4px; }
     .cl-type {
-      font-size: 0.68rem; color: #888; text-transform: uppercase;
+      font-size: 0.68rem; color: #8b909a; text-transform: uppercase;
       letter-spacing: 0.05em; margin-left: 8px; flex-shrink: 0;
     }
   </style>
@@ -241,7 +243,7 @@
       <button type="button" class="map-popup-close" aria-label="Close">&times;</button>
       <div class="map-popup-body"></div>
     </div>
-    <div id="map-attrib">Land © <a href="https://www.naturalearthdata.com/" target="_blank" rel="noreferrer">Natural Earth</a> · Places © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a></div>
+    <div id="map-attrib">Imagery © <a href="https://earthobservatory.nasa.gov/" target="_blank" rel="noreferrer">NASA Earth Observatory</a></div>
   </div>
   <script type="module" src="/src/map.ts"></script>
 </body>

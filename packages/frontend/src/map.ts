@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { API_BASE_URL } from './constants';
-// Public-domain Natural Earth 110m land/lakes, cream land / pale ocean — no vendor watermark.
-import earthVoyagerUrl from './assets/earth-voyager.png';
+// Public-domain NASA Blue Marble (Visible Earth 57730, land/ocean/ice, 2048x1024) — no vendor watermark.
+import earthBlueMarbleUrl from './assets/earth-blue-marble.jpg';
 
 interface MapLandmark {
   name: string;
@@ -26,7 +26,7 @@ interface MarkerUserData {
 
 const GLOBE_R = 1;
 const UP = new THREE.Vector3(0, 1, 0);
-const PIN_STEM_H = 0.012;
+const PIN_STEM_H = 0.004;
 const PIN_STEM_R = 0.00115;
 const PIN_SPHERE_R = 0.006;
 const PIN_RING_R = 0.0074;
@@ -162,7 +162,7 @@ function init() {
   const mapEl = container;
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xe8eef2);
+  scene.background = new THREE.Color(0x0e1116);
 
   const camera = new THREE.PerspectiveCamera(45, 1, 0.05, 20);
   camera.position.copy(latLngToVec(START_LAT, START_LNG, START_DIST));
@@ -171,62 +171,29 @@ function init() {
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.setClearColor(0xe8eef2, 1);
+  renderer.setClearColor(0x0e1116, 1);
   mapEl.appendChild(renderer.domElement);
 
-  const ambient = new THREE.AmbientLight(0xffffff, 0.4);
+  const ambient = new THREE.AmbientLight(0xffffff, 0.25);
   scene.add(ambient);
-  const hemi = new THREE.HemisphereLight(0xf4f7fb, 0x8aa3b5, 0.28);
-  scene.add(hemi);
-  const key = new THREE.DirectionalLight(0xffffff, 1.15);
-  key.position.set(2.4, 1.35, 1.6);
-  scene.add(key);
-  const fill = new THREE.DirectionalLight(0xc5d4e2, 0.22);
-  fill.position.set(-1.8, -0.4, -1.2);
-  scene.add(fill);
-  scene.add(camera);
-
-  function recolorVoyager(image: CanvasImageSource): HTMLCanvasElement {
-    const src = image as CanvasImageSource & { width: number; height: number };
-    const w = src.width || 1024;
-    const h = src.height || 512;
-    const canvas = document.createElement('canvas');
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return canvas;
-    ctx.drawImage(image, 0, 0, w, h);
-    const img = ctx.getImageData(0, 0, w, h);
-    const d = img.data;
-    // Land #e4d5bc  ocean #9eb6c8
-    for (let i = 0; i < d.length; i += 4) {
-      const r = d[i], g = d[i + 1], b = d[i + 2];
-      const ocean = b > r + 4 || (b > 150 && b >= g);
-      if (ocean) {
-        d[i] = 0x9e; d[i + 1] = 0xb6; d[i + 2] = 0xc8;
-      } else {
-        d[i] = 0xe4; d[i + 1] = 0xd5; d[i + 2] = 0xbc;
-      }
-    }
-    ctx.putImageData(img, 0, 0);
-    return canvas;
-  }
+  // World-space sun (not parented to camera) so a gentle night side stays put while orbiting.
+  const sun = new THREE.DirectionalLight(0xfff4e6, 1.15);
+  sun.position.set(1.8, 2.0, 1.6);
+  scene.add(sun);
 
   const texLoader = new THREE.TextureLoader();
   const earthMat = new THREE.MeshStandardMaterial({
-    color: 0xe4d5bc,
-    roughness: 0.86,
-    metalness: 0.02,
+    color: 0xffffff,
+    roughness: 0.85,
+    metalness: 0,
   });
-  const earthTex = texLoader.load(earthVoyagerUrl, (tex) => {
-    tex.image = recolorVoyager(tex.image);
+  const earthTex = texLoader.load(earthBlueMarbleUrl, (tex) => {
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
     tex.minFilter = THREE.LinearMipmapLinearFilter;
     tex.magFilter = THREE.LinearFilter;
     tex.needsUpdate = true;
     earthMat.map = tex;
-    earthMat.color.set(0xffffff);
     earthMat.needsUpdate = true;
   });
   earthTex.colorSpace = THREE.SRGBColorSpace;
@@ -239,13 +206,35 @@ function init() {
   scene.add(globe);
 
   const atmo = new THREE.Mesh(
-    new THREE.SphereGeometry(GLOBE_R * 1.012, 64, 48),
-    new THREE.MeshBasicMaterial({
-      color: 0xb7cde0,
-      transparent: true,
-      opacity: 0.11,
+    new THREE.SphereGeometry(GLOBE_R * 1.018, 64, 48),
+    new THREE.ShaderMaterial({
+      uniforms: {
+        uColor: { value: new THREE.Color(0x4d8fd6) },
+      },
+      vertexShader: /* glsl */ `
+        varying vec3 vNormal;
+        varying vec3 vViewDir;
+        void main() {
+          vec4 worldPos = modelMatrix * vec4(position, 1.0);
+          vNormal = normalize(mat3(modelMatrix) * normal);
+          vViewDir = normalize(cameraPosition - worldPos.xyz);
+          gl_Position = projectionMatrix * viewMatrix * worldPos;
+        }
+      `,
+      fragmentShader: /* glsl */ `
+        uniform vec3 uColor;
+        varying vec3 vNormal;
+        varying vec3 vViewDir;
+        void main() {
+          float ndotv = abs(dot(normalize(vNormal), normalize(vViewDir)));
+          float fresnel = pow(1.0 - ndotv, 4.2);
+          gl_FragColor = vec4(uColor, fresnel * 0.72);
+        }
+      `,
       side: THREE.BackSide,
+      transparent: true,
       depthWrite: false,
+      blending: THREE.AdditiveBlending,
     }),
   );
   atmo.raycast = () => {};
@@ -295,7 +284,7 @@ function init() {
   function makeCluster(lat: number, lng: number, members: MapLandmark[]): THREE.Group {
     const group = new THREE.Group();
     const ball = new THREE.Mesh(clusterGeom, clusterMat);
-    ball.position.y = CLUSTER_R * 0.55;
+    ball.position.y = CLUSTER_R * 0.32;
     let tex = labelTexCache.get(members.length);
     if (!tex) {
       tex = makeLabelTexture(members.length);
@@ -435,17 +424,16 @@ function init() {
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enablePan = false;
   controls.enableDamping = true;
-  controls.dampingFactor = 0.085;
+  controls.dampingFactor = 0.045;
   controls.minDistance = MIN_DIST;
   controls.maxDistance = MAX_DIST;
   controls.rotateSpeed = 0.55;
   controls.zoomSpeed = 0.95;
-  controls.autoRotate = true;
-  controls.autoRotateSpeed = 0.55;
+  controls.autoRotate = false;
   controls.target.set(0, 0, 0);
   controls.update();
 
-  function flyTo(lat: number, lng: number, distance: number, duration = 1100): Promise<void> {
+  function flyTo(lat: number, lng: number, distance: number, duration = 1800): Promise<void> {
     const start = camera.position.clone();
     const end = latLngToVec(lat, lng, distance);
     const startLen = start.length();
@@ -453,7 +441,6 @@ function init() {
     const t0 = performance.now();
     flying = true;
     controls.enabled = false;
-    controls.autoRotate = false;
     return new Promise((resolve) => {
       const step = (now: number) => {
         const t = Math.min(1, (now - t0) / duration);
@@ -681,8 +668,6 @@ function init() {
         statusEl.textContent = "Couldn't load landmarks";
         statusEl.hidden = false;
       }
-    } finally {
-      controls.autoRotate = false;
     }
   }
 
