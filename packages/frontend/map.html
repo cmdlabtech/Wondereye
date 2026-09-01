@@ -110,61 +110,100 @@
       font-size: 0.82rem;
       color: #888;
     }
-    .wmap-geo-dot {
-      width: 12px;
-      height: 12px;
-      background: #2563eb;
-      border-radius: 50%;
-      border: 1.5px solid rgba(255,255,255,0.9);
-      box-shadow: 0 0 4px rgba(0,0,0,0.35);
+    .map-stage {
+      flex: 1;
+      min-height: 0;
+      position: relative;
+      background: #d6e4ec;
     }
     #map {
-      flex: 1;
+      position: absolute;
+      inset: 0;
       padding-bottom: env(safe-area-inset-bottom);
     }
-    .leaflet-container { background: #e8e8e8; }
-    /* Cluster icons */
-    .wmap-cluster {
+    #map canvas {
+      display: block;
       width: 100%;
       height: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #16a34a;
-      color: #fff;
-      font-size: 0.75rem;
-      font-weight: 700;
-      border-radius: 50%;
-      border: 2px solid #fff;
-      box-sizing: border-box;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+      touch-action: none;
     }
-    /* Light popup */
-    .leaflet-popup-content-wrapper {
+    #map-status {
+      position: absolute;
+      left: 50%;
+      top: 1rem;
+      transform: translateX(-50%);
+      background: rgba(255,255,255,0.94);
+      border: 1px solid #e0e0e0;
+      border-radius: 999px;
+      padding: 0.45rem 0.95rem;
+      font-size: 0.82rem;
+      color: #555;
+      pointer-events: none;
+      z-index: 8;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      white-space: nowrap;
+    }
+    #map-status[hidden] { display: none; }
+    #map-attrib {
+      position: absolute;
+      left: max(0.5rem, env(safe-area-inset-left));
+      bottom: max(0.4rem, env(safe-area-inset-bottom));
+      font-size: 0.65rem;
+      color: #667;
+      background: rgba(255,255,255,0.78);
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+      z-index: 7;
+      line-height: 1.3;
+    }
+    #map-attrib a { color: #556; text-decoration: none; }
+    #map-attrib a:hover { text-decoration: underline; }
+    #map-popup {
+      position: absolute;
+      z-index: 9;
       background: #fff;
       color: #1a1a1a;
       border: 1px solid #ddd;
       border-radius: 6px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.15);
       font-size: 0.85rem;
+      width: max-content;
       max-width: min(280px, calc(100vw - 40px));
+      transform: translate(-50%, calc(-100% - 14px));
     }
-    .leaflet-popup-tip { background: #fff; }
-    /* Scrollable popup body (long cluster lists / snippets) */
-    .leaflet-popup-scrolled {
-      border-top: 1px solid #eee;
-      border-bottom: 1px solid #eee;
+    #map-popup[hidden] { display: none; }
+    #map-popup::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      bottom: -6px;
+      width: 10px;
+      height: 10px;
+      background: #fff;
+      border-right: 1px solid #ddd;
+      border-bottom: 1px solid #ddd;
+      transform: translateX(-50%) rotate(45deg);
+    }
+    .map-popup-close {
+      position: absolute;
+      top: 0;
+      right: 0;
+      color: #999;
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+      background: none;
+      border: none;
+      cursor: pointer;
+    }
+    .map-popup-body {
+      padding: 10px 44px 10px 12px;
+      max-height: 260px;
       overflow-y: auto;
       overscroll-behavior: contain;
-    }
-    .leaflet-popup-close-button {
-      color: #999 !important;
-      width: 44px !important;
-      height: 44px !important;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      font-size: 1.25rem !important;
     }
     .popup-type {
       font-size: 0.7rem;
@@ -172,21 +211,6 @@
       text-transform: uppercase;
       letter-spacing: 0.06em;
     }
-    /* Landmark marker: visible dot with large transparent touch area */
-    .wmap-marker {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .wmap-marker-dot {
-      width: 10px;
-      height: 10px;
-      background: #16a34a;
-      border-radius: 50%;
-      border: 1.5px solid rgba(255,255,255,0.9);
-      box-shadow: 0 0 4px rgba(0,0,0,0.35);
-    }
-    /* Cluster landmark list */
     .cl-list { display: flex; flex-direction: column; gap: 2px; }
     .cl-item {
       display: flex; justify-content: space-between; align-items: center;
@@ -210,7 +234,15 @@
     </div>
     <span id="count"></span>
   </header>
-  <div id="map"></div>
+  <div class="map-stage">
+    <div id="map"></div>
+    <div id="map-status">Loading landmarks…</div>
+    <div id="map-popup" hidden>
+      <button type="button" class="map-popup-close" aria-label="Close">&times;</button>
+      <div class="map-popup-body"></div>
+    </div>
+    <div id="map-attrib">Land © <a href="https://www.naturalearthdata.com/" target="_blank" rel="noreferrer">Natural Earth</a> · Places © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a></div>
+  </div>
   <script type="module" src="/src/map.ts"></script>
 </body>
 </html>

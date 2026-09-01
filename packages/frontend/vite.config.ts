@@ -28,7 +28,7 @@ function stripInternalFiles(isEhpk: boolean): Plugin {
 export default defineConfig(({ mode }) => {
   // EHPK builds (glasses app bundle) exclude the phone-web-only pages:
   // index.html (homepage, replaced by app.html during pack) and map.html
-  // (Leaflet — its tile/attribution URLs are not network-whitelisted).
+  // (community 3D globe — phone-web only, not packed for glasses).
   const isEhpk = mode === 'ehpk';
   const input: Record<string, string> = isEhpk
     ? {
