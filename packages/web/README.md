@@ -2,7 +2,7 @@
 
 Preview of the redesigned landing page and 3D map (`/`, `/map`).
 
-This package is **not wired to production**. `wondereye.app` still deploys from `packages/frontend`. Do not run wrangler against this folder unless you intend to replace the live site.
+`npm run deploy:frontend` builds this package, overlays it on the glasses site (`app.html` stays at `/app.html`), and deploys to `wondereye.app`. `/` and `/map` are the globe SPA.
 
 ## What’s here
 
@@ -14,7 +14,12 @@ This package is **not wired to production**. `wondereye.app` still deploys from 
 
 ## Local
 
-This snapshot is source from the Grok preview. A full Vite/TanStack Start scaffold is still needed to `npm run dev` in isolation. The important files:
+```bash
+npm install
+npm run dev:web
+```
+
+Then open `http://localhost:5174`. The important files:
 
 - `src/components/globe-host.tsx` — persistent Three.js globe + hero/map presentation
 - `src/lib/globe-engine.ts` — sphere, orbit, pins, borders

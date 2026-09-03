@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import type { Landmark } from "./landmarks";
-import { EARTH_URL, type MarkerPick } from "./globe-types";
+import { EARTH_URL, FLY_PLACE_DIST, type MarkerPick } from "./globe-types";
 
 export type { MarkerKind, MarkerPick } from "./globe-types";
 export { FLY_LANDMARK_DIST, FLY_PLACE_DIST } from "./globe-types";
@@ -41,7 +41,6 @@ type FlyAnim = {
   resolve: () => void;
 };
 
-const EARTH_URL = "/earth-fs6.jpg";
 let earthTex: THREE.Texture | null = null;
 const earthTexWaiters: Array<(tex: THREE.Texture) => void> = [];
 
@@ -94,11 +93,20 @@ const START_DIST = 2.5;
 const _east = new THREE.Vector3();
 const _dir = new THREE.Vector3();
 const _tmp = new THREE.Vector3();
+const _segA = new THREE.Vector3();
+const _segB = new THREE.Vector3();
+const _projWorld = new THREE.Vector3();
+const _projCam = new THREE.Vector3();
+const _projN = new THREE.Vector3();
+const _projClip = new THREE.Vector3();
+const _limb = new THREE.Vector3();
+const _limbC = new THREE.Vector3();
+const _limbE = new THREE.Vector3();
 
-function latLngToVec(lat: number, lng: number, radius = GLOBE_R): THREE.Vector3 {
+function latLngToVec(lat: number, lng: number, radius = GLOBE_R, out = new THREE.Vector3()): THREE.Vector3 {
   const phi = (90 - lat) * (Math.PI / 180);
   const theta = (lng + 180) * (Math.PI / 180);
-  return new THREE.Vector3(
+  return out.set(
     -radius * Math.sin(phi) * Math.cos(theta),
     radius * Math.cos(phi),
     radius * Math.sin(phi) * Math.sin(theta),
@@ -133,6 +141,14 @@ function easeInOutQuint(t: number): number {
   return t < 0.5 ? 16 * t * t * t * t * t : 1 - (-2 * t + 2) ** 5 / 2;
 }
 
+function scheduleIdle(cb: () => void, timeout = 800) {
+  if (typeof requestIdleCallback === "function") {
+    requestIdleCallback(cb, { timeout });
+    return;
+  }
+  window.setTimeout(cb, Math.min(timeout, 250));
+}
+
 function makeSolidTex(r: number, g: number, b: number): THREE.DataTexture {
   const tex = new THREE.DataTexture(new Uint8Array([r, g, b, 255]), 1, 1);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -163,9 +179,9 @@ function polylinesToSegments(lines: number[][][], radius: number): Float32Array 
       const a = line[i - 1];
       const b = line[i];
       if (Math.abs(b[0] - a[0]) > 180) continue;
-      const pa = latLngToVec(a[1], a[0], radius);
-      const pb = latLngToVec(b[1], b[0], radius);
-      pts.push(pa.x, pa.y, pa.z, pb.x, pb.y, pb.z);
+      latLngToVec(a[1], a[0], radius, _segA);
+      latLngToVec(b[1], b[0], radius, _segB);
+      pts.push(_segA.x, _segA.y, _segA.z, _segB.x, _segB.y, _segB.z);
     }
   }
   return new Float32Array(pts);
@@ -215,8 +231,18 @@ export class WonderGlobe {
   private downY = 0;
   private raf = 0;
   private disposed = false;
+  private painted = false;
   private lastTick = 0;
   private holdIdle = false;
+  private drawQuality: "hero" | "map" = "hero";
+
+  get ready() {
+    return this.painted;
+  }
+
+  get isDisposed() {
+    return this.disposed;
+  }
 
   constructor(container: HTMLElement, handlers: GlobeHandlers) {
     this.container = container;
@@ -230,8 +256,13 @@ export class WonderGlobe {
     this.camera.position.copy(latLngToVec(START_LAT, START_LNG, START_DIST));
     this.camera.lookAt(0, 0, 0);
 
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    const bootDpr = window.devicePixelRatio || 1;
+    this.renderer = new THREE.WebGLRenderer({
+      antialias: bootDpr < 1.5,
+      alpha: false,
+      powerPreference: "high-performance",
+    });
+    this.renderer.setPixelRatio(Math.min(bootDpr, 1));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.NoToneMapping;
     this.renderer.setClearColor(0x000000, 1);
@@ -254,9 +285,10 @@ export class WonderGlobe {
 
     whenEarthTexture((tex) => {
       if (this.disposed) return;
+      const prev = this.earthMat.map;
       this.earthMat.map = tex;
       this.earthMat.needsUpdate = true;
-      this.handlers.onReady();
+      if (prev && prev !== earthTex && prev !== tex) prev.dispose();
     });
 
     this.pulseGeom.rotateX(-Math.PI / 2);
@@ -296,10 +328,18 @@ export class WonderGlobe {
     this.sizeRenderer();
     this.ro.observe(container);
     this.lastTick = performance.now();
+    this.renderer.render(this.scene, this.camera);
+    this.notifyReady();
     this.loop();
-    window.setTimeout(() => {
+    scheduleIdle(() => {
       if (!this.disposed) void this.loadBorders("c");
-    }, 100);
+    }, 800);
+  }
+
+  private notifyReady() {
+    if (this.painted) return;
+    this.painted = true;
+    this.handlers.onReady();
   }
 
   private ro = new ResizeObserver(() => this.sizeRenderer());
@@ -309,7 +349,11 @@ export class WonderGlobe {
     const h = Math.max(1, this.container.clientHeight);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
-    this.renderer.setSize(w, h, false);
+    const hero = this.drawQuality === "hero";
+    const dpr = Math.min(window.devicePixelRatio || 1, hero ? 1 : 2);
+    this.renderer.setPixelRatio(dpr);
+    const scale = hero ? 0.55 : 1;
+    this.renderer.setSize(Math.max(1, Math.round(w * scale)), Math.max(1, Math.round(h * scale)), false);
   }
 
   private async loadBorders(kind: "c" | "s") {
@@ -402,17 +446,20 @@ export class WonderGlobe {
   }
 
   project(lat: number, lng: number, lift = PIN_STEM_H + PIN_HEAD_R): { x: number; y: number; visible: boolean } | null {
-    const world = latLngToVec(lat, lng, GLOBE_R + lift);
-    const camDir = this.camera.position.clone().normalize();
-    const n = world.clone().normalize();
-    const projected = world.clone().project(this.camera);
+    latLngToVec(lat, lng, GLOBE_R + lift, _projWorld);
+    _projCam.copy(this.camera.position).normalize();
+    _projN.copy(_projWorld).normalize();
+    _projClip.copy(_projWorld).project(this.camera);
     const visible =
-      n.dot(camDir) > 0.08 && projected.z < 1 && Math.abs(projected.x) < 1.2 && Math.abs(projected.y) < 1.2;
+      _projN.dot(_projCam) > 0.08 &&
+      _projClip.z < 1 &&
+      Math.abs(_projClip.x) < 1.2 &&
+      Math.abs(_projClip.y) < 1.2;
     const w = this.container.clientWidth;
     const h = this.container.clientHeight;
     return {
-      x: (projected.x * 0.5 + 0.5) * w,
-      y: (-projected.y * 0.5 + 0.5) * h,
+      x: (_projClip.x * 0.5 + 0.5) * w,
+      y: (-_projClip.y * 0.5 + 0.5) * h,
       visible,
     };
   }
@@ -492,7 +539,10 @@ export class WonderGlobe {
 
   setPresentation(mode: "hero" | "map") {
     const hero = mode === "hero";
+    const nextQuality = mode;
+    const qualityChange = this.drawQuality !== nextQuality;
     this.presentation = mode;
+    this.drawQuality = nextQuality;
     this.controls.enabled = !hero;
     this.controls.enableRotate = !hero;
     this.controls.enableZoom = !hero;
@@ -506,6 +556,8 @@ export class WonderGlobe {
       if (!this.reducedMotion) this.controls.autoRotate = true;
     }
     if (this.landmarks.length && this.domPins.length === 0) this.rebuildMarkers();
+    if (qualityChange) this.sizeRenderer();
+    if (this.domPins.length || this.geoPin) this.layoutPins();
   }
 
   attach(container: HTMLElement) {
@@ -518,21 +570,21 @@ export class WonderGlobe {
     this.sizeRenderer();
   }
 
-  setHandlers(handlers: GlobeHandlers) {
-    this.handlers = handlers;
+  setHandlers(handlers: Partial<GlobeHandlers>) {
+    this.handlers = { ...this.handlers, ...handlers };
   }
 
   globeScreenRadius(): number {
-    const cam = this.camera.position.clone().normalize();
-    const limb = new THREE.Vector3().crossVectors(cam, UP);
-    if (limb.lengthSq() < 1e-8) limb.set(1, 0, 0);
-    limb.normalize().multiplyScalar(GLOBE_R);
-    const c = new THREE.Vector3(0, 0, 0).project(this.camera);
-    const e = limb.project(this.camera);
+    _projCam.copy(this.camera.position).normalize();
+    _limb.crossVectors(_projCam, UP);
+    if (_limb.lengthSq() < 1e-8) _limb.set(1, 0, 0);
+    _limb.normalize().multiplyScalar(GLOBE_R);
+    _limbC.set(0, 0, 0).project(this.camera);
+    _limbE.copy(_limb).project(this.camera);
     const w = this.container.clientWidth;
     const h = this.container.clientHeight;
-    const dx = (e.x - c.x) * 0.5 * w;
-    const dy = (e.y - c.y) * 0.5 * h;
+    const dx = (_limbE.x - _limbC.x) * 0.5 * w;
+    const dy = (_limbE.y - _limbC.y) * 0.5 * h;
     return Math.max(24, Math.hypot(dx, dy));
   }
 
@@ -551,6 +603,19 @@ export class WonderGlobe {
     this.canvas.removeEventListener("pointerleave", this.onPointerLeave);
     this.canvas.removeEventListener("dblclick", this.onDblClick);
     this.controls.dispose();
+    for (const r of this.ripples) {
+      this.scene.remove(r.mesh);
+      (r.mesh.material as THREE.Material).dispose();
+    }
+    this.ripples.length = 0;
+    this.earth.geometry.dispose();
+    if (this.earthMat.map && this.earthMat.map !== earthTex) this.earthMat.map.dispose();
+    this.earthMat.dispose();
+    this.pulseGeom.dispose();
+    this.scene.traverse((obj) => {
+      if (obj instanceof THREE.LineSegments) obj.geometry.dispose();
+    });
+    for (const mat of this.borderMats) mat.dispose();
     this.renderer.dispose();
     this.labelsEl.remove();
     this.canvas.remove();
@@ -610,10 +675,7 @@ export class WonderGlobe {
   }
 
   private makeDomPin(data: MarkerPick): DomPin {
-    const el = document.createElement("button");
-    el.type = "button";
-    el.className = "globe-pin";
-    el.innerHTML = '<span class="globe-pin-shape"><span class="globe-pin-core"></span></span>';
+    const el = makePinEl();
     el.setAttribute("aria-label", data.landmark?.name ?? data.label ?? "Pin");
     el.addEventListener("pointerdown", (e) => e.stopPropagation());
     el.addEventListener("click", (e) => {
@@ -638,13 +700,16 @@ export class WonderGlobe {
     this.labelsEl.replaceChildren();
     this.domPins = [];
     this.selected = null;
+    const frag = document.createDocumentFragment();
     for (const lm of this.landmarks) {
       const pin = this.makeDomPin({ kind: "pin", lat: lm.lat, lng: lm.lng, landmark: lm });
       this.domPins.push(pin);
-      this.labelsEl.appendChild(pin.el);
+      frag.appendChild(pin.el);
       if (this.focusLandmark && this.isFocus(lm)) this.selected = pin.data;
     }
+    this.labelsEl.appendChild(frag);
     if (this.geoPin) this.labelsEl.appendChild(this.geoPin.el);
+    this.layoutPins();
   }
 
   private layoutPins() {
@@ -654,7 +719,7 @@ export class WonderGlobe {
     const layout = (pin: DomPin) => {
       const pos = this.project(pin.lat, pin.lng, 0.01);
       if (!pos || !pos.visible) {
-        pin.el.style.display = "none";
+        if (pin.el.style.display !== "none") pin.el.style.display = "none";
         return;
       }
       const on = this.selected === pin.data || this.hovered === pin.data;
@@ -765,11 +830,51 @@ export class WonderGlobe {
     }
 
     this.pinAge += dt;
-    if (this.presentation === "map" && this.pinAge > 0.033) {
+    if ((this.domPins.length || this.geoPin) && this.pinAge > 0.033) {
       this.pinAge = 0;
       this.layoutPins();
     }
     this.fadeBorders();
     this.renderer.render(this.scene, this.camera);
   };
+}
+
+let sharedGlobe: WonderGlobe | null = null;
+let globeUsers = 0;
+let pinNode: HTMLButtonElement | null = null;
+
+function makePinEl(): HTMLButtonElement {
+  if (!pinNode) {
+    pinNode = document.createElement("button");
+    pinNode.type = "button";
+    pinNode.className = "globe-pin";
+    const shape = document.createElement("span");
+    shape.className = "globe-pin-shape";
+    const core = document.createElement("span");
+    core.className = "globe-pin-core";
+    shape.appendChild(core);
+    pinNode.appendChild(shape);
+  }
+  return pinNode.cloneNode(true) as HTMLButtonElement;
+}
+
+export function acquireGlobe(container: HTMLElement, handlers: GlobeHandlers): WonderGlobe {
+  globeUsers += 1;
+  if (sharedGlobe && !sharedGlobe.isDisposed) {
+    sharedGlobe.attach(container);
+    sharedGlobe.setHandlers(handlers);
+    if (sharedGlobe.ready) queueMicrotask(() => handlers.onReady());
+    return sharedGlobe;
+  }
+  sharedGlobe = new WonderGlobe(container, handlers);
+  return sharedGlobe;
+}
+
+export function releaseGlobe(globe: WonderGlobe) {
+  globeUsers = Math.max(0, globeUsers - 1);
+  window.setTimeout(() => {
+    if (globeUsers > 0 || sharedGlobe !== globe) return;
+    globe.dispose();
+    sharedGlobe = null;
+  }, 0);
 }

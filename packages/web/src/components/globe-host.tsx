@@ -1,19 +1,19 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useRouterState } from "@tanstack/react-router";
-import { WonderGlobe } from "@/lib/globe-engine";
-import { loadLandmarks } from "@/lib/landmarks";
+import type { WonderGlobe } from "@/lib/globe-engine";
+import { loadLandmarks, type Landmark } from "@/lib/landmarks";
 import { useGlobeSession } from "@/lib/globe-session";
 import { warmEarthImage } from "@/lib/globe-types";
 import { cn } from "@/lib/cn";
 
+warmEarthImage();
+
 const noop = () => {};
 const GLOBE_SCREEN_K = 0.346;
-warmEarthImage();
 
 export function GlobeHost() {
   const stageRef = useRef<HTMLDivElement>(null);
   const globeRef = useRef<WonderGlobe | null>(null);
-  const [animOn, setAnimOn] = useState(false);
   const [painted, setPainted] = useState(false);
   const [view, setView] = useState({ w: 1280, h: 800 });
   const mode = useGlobeSession((s) => s.mode);
@@ -23,9 +23,12 @@ export function GlobeHost() {
   const setReady = useGlobeSession((s) => s.setReady);
   const setMode = useGlobeSession((s) => s.setMode);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
 
   const expanded = mode === "opening" || mode === "map";
   const live = mode === "map";
+  const morphing = mode === "opening" || mode === "closing";
 
   useEffect(() => {
     if (pathname === "/map") {
@@ -38,28 +41,40 @@ export function GlobeHost() {
   useEffect(() => {
     const el = stageRef.current;
     if (!el) return;
-    const globe = new WonderGlobe(el, {
-      onPick: noop,
-      onHover: noop,
-      onReady: () => {
-        document.documentElement.classList.add("globe-on");
-        setPainted(true);
-        setReady(true);
-      },
-    });
-    globeRef.current = globe;
-    setGlobe(globe);
-    (window as unknown as { __wonderGlobe?: WonderGlobe }).__wonderGlobe = globe;
-    void loadLandmarks()
-      .then((list) => {
+    let alive = true;
+    let globe: WonderGlobe | null = null;
+    let release: ((g: WonderGlobe) => void) | null = null;
+
+    void import("@/lib/globe-engine").then(({ acquireGlobe, releaseGlobe }) => {
+      if (!alive || !stageRef.current) return;
+      release = releaseGlobe;
+      globe = acquireGlobe(stageRef.current, {
+        onPick: noop,
+        onHover: noop,
+        onReady: () => {
+          document.documentElement.classList.add("globe-on");
+          setPainted(true);
+          setReady(true);
+        },
+      });
+      globe.setPresentation(modeRef.current === "map" ? "map" : "hero");
+      globeRef.current = globe;
+      setGlobe(globe);
+      (window as unknown as { __wonderGlobe?: WonderGlobe }).__wonderGlobe = globe;
+      const mounted = globe;
+      const apply = (list: Landmark[]) => {
+        if (globeRef.current !== mounted) return;
         setLandmarks(list);
-        globe.setLandmarks(list);
-      })
-      .catch(() => {});
+        mounted.setLandmarks(list);
+      };
+      void loadLandmarks(apply).catch(() => {});
+    });
+
     return () => {
+      alive = false;
       const w = window as unknown as { __wonderGlobe?: WonderGlobe };
-      if (w.__wonderGlobe === globe) delete w.__wonderGlobe;
-      globe.dispose();
+      if (globe && w.__wonderGlobe === globe) delete w.__wonderGlobe;
+      if (globe && release) release(globe);
       globeRef.current = null;
       setGlobe(null);
     };
@@ -75,12 +90,6 @@ export function GlobeHost() {
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
   }, []);
-
-  useEffect(() => {
-    if (!slot) return;
-    const t = window.setTimeout(() => setAnimOn(true), 40);
-    return () => window.clearTimeout(t);
-  }, [slot]);
 
   const s = slot?.r ?? 0;
   const globeR = Math.max(24, GLOBE_SCREEN_K * view.h);
@@ -99,16 +108,16 @@ export function GlobeHost() {
         "globe-frame",
         live && "is-live",
         expanded && "is-expanded",
-        mode === "opening" && "is-opening",
-        animOn && "can-anim",
-        painted && "is-painted",
+        morphing && "is-opening",
+        morphing && "can-anim",
+        painted && (live || !!slot) && "is-painted",
       )}
       style={clip ? { clipPath: clip } : undefined}
       aria-hidden={mode === "hero" || mode === "opening"}
     >
       <div
         ref={stageRef}
-        className={cn("globe-host", animOn && "can-anim")}
+        className={cn("globe-host", morphing && "can-anim")}
         style={{
           transform: expanded || !slot ? "none" : `translate(${tx}px, ${ty}px) scale(${heroScale})`,
         }}

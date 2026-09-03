@@ -22,18 +22,40 @@ async function fromSnapshot(): Promise<Landmark[]> {
   return Array.isArray(data.landmarks) ? data.landmarks : [];
 }
 
-export async function loadLandmarks(): Promise<Landmark[]> {
-  const snapshot = fromSnapshot();
-  if (!onLiveOrigin()) return snapshot;
+const snapshotStart = typeof window === "undefined" ? null : fromSnapshot();
 
+async function loadLandmarksOnce(onUpdate?: (list: Landmark[]) => void): Promise<Landmark[]> {
+  let snapshot: Landmark[] = [];
   try {
-    const live = await fetch("https://api.wondereye.app/api/map", { signal: AbortSignal.timeout(2000) });
-    if (live.ok) {
-      const data = (await live.json()) as { landmarks?: Landmark[] };
-      if (Array.isArray(data.landmarks) && data.landmarks.length) return data.landmarks;
-    }
+    snapshot = await (snapshotStart ?? fromSnapshot());
+    if (snapshot.length) onUpdate?.(snapshot);
   } catch {
-    /* fall through to snapshot */
+    /* live origin can still recover */
   }
+
+  if (onLiveOrigin()) {
+    try {
+      const live = await fetch("https://api.wondereye.app/api/map", { signal: AbortSignal.timeout(2000) });
+      if (live.ok) {
+        const data = (await live.json()) as { landmarks?: Landmark[] };
+        if (Array.isArray(data.landmarks) && data.landmarks.length) {
+          onUpdate?.(data.landmarks);
+          return data.landmarks;
+        }
+      }
+    } catch {
+      /* keep snapshot */
+    }
+  }
+
+  if (!snapshot.length) throw new Error("Couldn't load landmarks");
   return snapshot;
+}
+
+let pending: Promise<Landmark[]> | null = null;
+
+export function loadLandmarks(onUpdate?: (list: Landmark[]) => void): Promise<Landmark[]> {
+  if (!pending) pending = loadLandmarksOnce(onUpdate);
+  else if (onUpdate) void pending.then(onUpdate);
+  return pending;
 }

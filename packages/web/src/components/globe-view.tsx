@@ -58,14 +58,12 @@ export function GlobeView() {
         }
       },
       onHover: setHover,
-      onReady: () => {},
     });
     setSpinning(globe.spinning);
     return () => {
       globe.setHandlers({
         onPick: () => {},
         onHover: () => {},
-        onReady: () => {},
       });
     };
   }, [globe]);
@@ -73,6 +71,17 @@ export function GlobeView() {
   useEffect(() => {
     if (!globe) return;
     let raf = 0;
+    const boxSize = (node: HTMLDivElement) => {
+      const cached = node.dataset.box;
+      if (cached) {
+        const [w, h] = cached.split(",");
+        return { w: Number(w) || 320, h: Number(h) || 200 };
+      }
+      const w = node.offsetWidth || 320;
+      const h = node.offsetHeight || 200;
+      node.dataset.box = `${w},${h}`;
+      return { w, h };
+    };
     const place = (node: HTMLDivElement | null, lat: number, lng: number, lift: number) => {
       if (!node) return;
       const pos = globe.project(lat, lng, lift);
@@ -81,8 +90,7 @@ export function GlobeView() {
         return;
       }
       node.style.visibility = "visible";
-      const boxH = node.offsetHeight || 200;
-      const boxW = node.offsetWidth || 320;
+      const { w: boxW, h: boxH } = boxSize(node);
       const header = 88;
       const stageH = window.innerHeight;
       const stageW = window.innerWidth;
@@ -108,6 +116,14 @@ export function GlobeView() {
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [globe]);
+
+  useEffect(() => {
+    delete popupRef.current?.dataset.box;
+  }, [pick]);
+
+  useEffect(() => {
+    delete hoverTipRef.current?.dataset.box;
+  }, [hover]);
 
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {

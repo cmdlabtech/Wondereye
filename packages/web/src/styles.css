@@ -183,9 +183,8 @@
   }
 
   .globe-frame.can-anim {
-    transition:
-      clip-path 920ms var(--ease-out),
-      opacity 180ms linear;
+    transition: clip-path 920ms var(--ease-out);
+    will-change: clip-path;
   }
 
   .globe-frame.is-opening {
@@ -208,6 +207,7 @@
 
   .globe-host.can-anim {
     transition: transform 920ms var(--ease-out);
+    will-change: transform;
   }
 
   .globe-frame.is-live .globe-host,
@@ -248,10 +248,7 @@
     border: 0;
     border-radius: 50%;
     background-color: #000;
-    background-image: url("/earth-fs6.jpg");
-    background-repeat: no-repeat;
-    background-size: 210% auto;
-    background-position: 44% 48%;
+    background-image: radial-gradient(circle at 35% 32%, #3a6ea8 0%, #16365f 38%, #081018 64%, #000 78%);
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
     appearance: none;
@@ -281,7 +278,6 @@
     background: transparent;
     pointer-events: auto;
     cursor: pointer;
-    will-change: transform;
   }
 
   .globe-pin-shape {
@@ -313,12 +309,10 @@
   from {
     opacity: 0;
     transform: translateY(12px);
-    filter: blur(4px);
   }
   to {
     opacity: 1;
     transform: none;
-    filter: none;
   }
 }
 

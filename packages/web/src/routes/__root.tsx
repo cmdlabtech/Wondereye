@@ -19,8 +19,7 @@ export const Route = createRootRoute({
     links: [
       { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
       { rel: "stylesheet", href: appCss },
-      { rel: "preload", as: "image", href: "/earth-fs6.jpg" },
-      { rel: "preload", as: "fetch", href: "/landmarks.json", crossOrigin: "anonymous" },
+      { rel: "preload", as: "image", href: "/earth-fs6.jpg", crossOrigin: "anonymous" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
