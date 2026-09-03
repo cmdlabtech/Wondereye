@@ -1,0 +1,337 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #000000;
+  --color-surface: #0e0e0e;
+  --color-surface-2: #171717;
+  --color-fg: #ffffff;
+  --color-muted: #8d8d8d;
+  --color-primary: #ffffff;
+  --color-primary-dim: #c8c8c8;
+  --color-ink: #111111;
+  --color-paper: #ffffff;
+  --color-paper-hover: #f4f4f4;
+  --color-border: #ffffff29;
+  --color-ring-hover: #ffffff47;
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Syne", ui-sans-serif, system-ui, sans-serif;
+  --shadow-ring: 0 0 0 1px #ffffff29;
+  --shadow-ring-hover: 0 0 0 1px #ffffff47;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+    color-scheme: dark;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background: var(--color-bg);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+    font-family: var(--font-display);
+    font-weight: 500;
+    letter-spacing: -0.04em;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+}
+
+@layer components {
+  .chrome {
+    background: var(--color-surface);
+    color: var(--color-fg);
+    box-shadow: var(--shadow-ring);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    padding: 0 1.1rem 0 1.2rem;
+    border-radius: 0;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    line-height: 1;
+    transition:
+      transform 150ms ease-out,
+      background-color 150ms var(--ease-out),
+      box-shadow 150ms var(--ease-out),
+      color 150ms var(--ease-out);
+  }
+
+  .btn:active:not(:disabled) {
+    transform: scale(0.96);
+  }
+
+  .btn-solid {
+    background: var(--color-paper);
+    color: var(--color-ink);
+  }
+
+  .btn-solid:hover {
+    background: var(--color-paper-hover);
+  }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--color-fg);
+    box-shadow: var(--shadow-ring);
+  }
+
+  .btn-ghost:hover {
+    box-shadow: var(--shadow-ring-hover);
+    background: var(--color-surface);
+  }
+
+  .rise {
+    animation: rise 500ms var(--ease-out) both;
+  }
+
+  .rise-2 {
+    animation-delay: 80ms;
+  }
+
+  .rise-3 {
+    animation-delay: 160ms;
+  }
+
+  .rise-4 {
+    animation-delay: 240ms;
+  }
+
+  .pin-card {
+    background: var(--color-paper);
+    color: var(--color-ink);
+    box-shadow: var(--shadow-ring), 0 18px 40px rgb(0 0 0 / 0.35);
+    border-radius: 0;
+    display: flex;
+    flex-direction: column;
+    max-height: min(70vh, 30rem);
+    animation: rise 250ms var(--ease-out) both;
+  }
+
+  .pin-card-copy {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .pin-diamond {
+    display: grid;
+    width: 0.7rem;
+    height: 0.7rem;
+    flex-shrink: 0;
+    place-items: center;
+    border: 1px solid currentColor;
+    background: transparent;
+    transform: rotate(45deg);
+  }
+
+  .pin-diamond i {
+    display: block;
+    width: 38%;
+    height: 38%;
+    border: 1px solid color-mix(in srgb, currentColor 45%, transparent);
+    background: color-mix(in srgb, currentColor 22%, transparent);
+  }
+
+  .pin-tip {
+    background: var(--color-paper);
+    color: var(--color-ink);
+    box-shadow: var(--shadow-ring), 0 8px 20px rgb(0 0 0 / 0.28);
+    border-radius: 0;
+  }
+
+  .globe-frame {
+    position: fixed;
+    inset: 0;
+    z-index: 2;
+    overflow: hidden;
+    pointer-events: none;
+    opacity: 0;
+  }
+
+  .globe-frame.is-painted {
+    opacity: 1;
+  }
+
+  .globe-frame.can-anim {
+    transition:
+      clip-path 920ms var(--ease-out),
+      opacity 180ms linear;
+  }
+
+  .globe-frame.is-opening {
+    z-index: 30;
+  }
+
+  .globe-frame.is-live {
+    z-index: 1;
+    pointer-events: auto;
+  }
+
+  .globe-host {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    transform-origin: 50% 50%;
+    background: #000;
+  }
+
+  .globe-host.can-anim {
+    transition: transform 920ms var(--ease-out);
+  }
+
+  .globe-frame.is-live .globe-host,
+  .globe-frame.is-live canvas {
+    pointer-events: auto;
+    touch-action: none;
+  }
+
+  .landing-leave {
+    transition:
+      opacity 720ms var(--ease-out),
+      transform 720ms var(--ease-out);
+  }
+
+  .is-leaving {
+    pointer-events: none;
+  }
+
+  .is-leaving .landing-leave {
+    opacity: 0;
+    transform: translateX(-3.25rem);
+    pointer-events: none;
+  }
+
+  .is-leaving .landing-leave-slow {
+    transform: translateY(1.25rem);
+  }
+
+  .map-chrome-enter {
+    animation: rise 500ms 220ms var(--ease-out) both;
+  }
+
+  .hero-orb {
+    display: block;
+    aspect-ratio: 1;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background-color: #000;
+    background-image: url("/earth-fs6.jpg");
+    background-repeat: no-repeat;
+    background-size: 210% auto;
+    background-position: 44% 48%;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    appearance: none;
+  }
+
+  html.globe-on .hero-orb {
+    background-image: none;
+    background-color: transparent;
+  }
+
+  .globe-pins {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .globe-pin {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    pointer-events: auto;
+    cursor: pointer;
+    will-change: transform;
+  }
+
+  .globe-pin-shape {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgb(255 255 255 / 0.89);
+    background: transparent;
+    transform: rotate(45deg);
+  }
+
+  .globe-pin-core {
+    width: 34%;
+    height: 34%;
+    border: 1px solid rgb(255 255 255 / 0.45);
+    background: rgb(255 255 255 / 0.24);
+  }
+
+  .globe-pin.is-hover .globe-pin-shape,
+  .globe-pin.is-on .globe-pin-shape {
+    background: rgb(255 255 255 / 0.16);
+    box-shadow: 0 0 0 1px rgb(255 255 255 / 0.35);
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .rise {
+    animation: none;
+  }
+}
