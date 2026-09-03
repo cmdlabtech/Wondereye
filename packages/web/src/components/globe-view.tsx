@@ -321,8 +321,8 @@ export function GlobeView() {
       <div
         ref={popupRef}
         className={cn(
-          "pointer-events-auto fixed z-30 w-[min(22.5rem,calc(100vw-1.5rem))]",
-          pick ? "" : "invisible",
+          "fixed z-30 w-[min(22.5rem,calc(100vw-1.5rem))]",
+          pick ? "pointer-events-auto" : "pointer-events-none invisible",
         )}
       >
         {pick ? (

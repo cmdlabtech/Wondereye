@@ -267,6 +267,10 @@
     z-index: 2;
   }
 
+  .globe-frame.is-live .globe-pin {
+    pointer-events: auto;
+  }
+
   .globe-pin {
     position: absolute;
     left: 0;
@@ -276,7 +280,7 @@
     padding: 0;
     border: 0;
     background: transparent;
-    pointer-events: auto;
+    pointer-events: none;
     cursor: pointer;
   }
 

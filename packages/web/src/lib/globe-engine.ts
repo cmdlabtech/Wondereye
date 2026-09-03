@@ -550,7 +550,7 @@ export class WonderGlobe {
     this.canvas.style.cursor = hero ? "default" : "grab";
     this.labelsEl.style.opacity = "1";
     this.labelsEl.style.display = "block";
-    this.labelsEl.style.pointerEvents = hero ? "none" : "auto";
+    this.labelsEl.style.pointerEvents = "none";
     if (hero) {
       this.holdIdle = false;
       if (!this.reducedMotion) this.controls.autoRotate = true;
