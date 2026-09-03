@@ -13,13 +13,6 @@ export type GlobeViewInfo = {
   flying: boolean;
 };
 
-type DomPin = {
-  el: HTMLButtonElement;
-  lat: number;
-  lng: number;
-  data: MarkerPick;
-};
-
 type OrbitInternals = OrbitControls & {
   _spherical: THREE.Spherical;
   _sphericalDelta: THREE.Spherical;
@@ -156,6 +149,41 @@ function makeSolidTex(r: number, g: number, b: number): THREE.DataTexture {
   return tex;
 }
 
+let diamondTex: THREE.CanvasTexture | null = null;
+
+function getDiamondTexture(): THREE.CanvasTexture {
+  if (diamondTex) return diamondTex;
+  const c = document.createElement("canvas");
+  c.width = c.height = 64;
+  const g = c.getContext("2d");
+  if (!g) {
+    diamondTex = new THREE.CanvasTexture(c);
+    return diamondTex;
+  }
+  const diamond = (inset: number) => {
+    g.beginPath();
+    g.moveTo(32, inset);
+    g.lineTo(64 - inset, 32);
+    g.lineTo(32, 64 - inset);
+    g.lineTo(inset, 32);
+    g.closePath();
+  };
+  g.strokeStyle = "rgba(255,255,255,0.92)";
+  g.lineWidth = 3.5;
+  diamond(8);
+  g.stroke();
+  g.fillStyle = "rgba(255,255,255,0.22)";
+  g.strokeStyle = "rgba(255,255,255,0.5)";
+  g.lineWidth = 2;
+  diamond(20);
+  g.fill();
+  g.stroke();
+  diamondTex = new THREE.CanvasTexture(c);
+  diamondTex.colorSpace = THREE.SRGBColorSpace;
+  diamondTex.needsUpdate = true;
+  return diamondTex;
+}
+
 function simplifyPolylines(lines: number[][][], minDeg: number): number[][][] {
   const out: number[][][] = [];
   for (const line of lines) {
@@ -201,9 +229,11 @@ export class WonderGlobe {
   private controls: OrbitControls;
   private earth: THREE.Mesh;
   private earthMat: THREE.MeshBasicMaterial;
-  private labelsEl: HTMLDivElement;
-  private domPins: DomPin[] = [];
-  private geoPin: DomPin | null = null;
+  private pinPoints: THREE.Points | null = null;
+  private pinPicks: MarkerPick[] = [];
+  private pinColors: THREE.Float32BufferAttribute | null = null;
+  private geoMarker: THREE.Sprite | null = null;
+  private geoPick: MarkerPick | null = null;
   private ripples: { mesh: THREE.Mesh; age: number }[] = [];
   private pulseGeom = new THREE.RingGeometry(0.008, 0.012, 24);
   private countryMat: THREE.LineBasicMaterial | null = null;
@@ -211,7 +241,6 @@ export class WonderGlobe {
   private borderMats: THREE.LineBasicMaterial[] = [];
   private statesLoaded = false;
   private statesLoading = false;
-  private pinAge = 0;
   private lastBorderDist = 0;
   private presentation: "hero" | "map" = "hero";
   private container: HTMLElement;
@@ -234,7 +263,6 @@ export class WonderGlobe {
   private painted = false;
   private lastTick = 0;
   private holdIdle = false;
-  private drawQuality: "hero" | "map" = "hero";
 
   get ready() {
     return this.painted;
@@ -293,10 +321,6 @@ export class WonderGlobe {
 
     this.pulseGeom.rotateX(-Math.PI / 2);
 
-    this.labelsEl = document.createElement("div");
-    this.labelsEl.className = "globe-pins";
-    container.appendChild(this.labelsEl);
-
     this.controls = new OrbitControls(this.camera, this.canvas);
     this.controls.enablePan = false;
     this.controls.enableDamping = true;
@@ -319,6 +343,7 @@ export class WonderGlobe {
       this.lastInput = performance.now();
     });
 
+    this.raycaster.params.Points = { threshold: 0.04 };
     this.canvas.addEventListener("pointerdown", this.onPointerDown);
     this.canvas.addEventListener("pointerup", this.onPointerUp);
     this.canvas.addEventListener("pointermove", this.onPointerMove);
@@ -349,11 +374,9 @@ export class WonderGlobe {
     const h = Math.max(1, this.container.clientHeight);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
-    const hero = this.drawQuality === "hero";
-    const dpr = Math.min(window.devicePixelRatio || 1, hero ? 1 : 2);
+    const dpr = Math.min(window.devicePixelRatio || 1, this.presentation === "hero" ? 1 : 2);
     this.renderer.setPixelRatio(dpr);
-    const scale = hero ? 0.55 : 1;
-    this.renderer.setSize(Math.max(1, Math.round(w * scale)), Math.max(1, Math.round(h * scale)), false);
+    this.renderer.setSize(w, h, false);
   }
 
   private async loadBorders(kind: "c" | "s") {
@@ -426,13 +449,11 @@ export class WonderGlobe {
   setFocus(lm: Landmark | null) {
     this.focusLandmark = lm;
     this.selected = null;
-    if (!lm) return;
-    for (const pin of this.domPins) {
-      if (pin.data.landmark && this.isFocus(pin.data.landmark)) {
-        this.selected = pin.data;
-        break;
-      }
+    if (lm) {
+      const hit = this.pinPicks.find((p) => p.landmark && this.isFocus(p.landmark));
+      if (hit) this.selected = hit;
     }
+    this.tintPins();
   }
 
   getView(): GlobeViewInfo {
@@ -512,9 +533,26 @@ export class WonderGlobe {
   }
 
   dropGeocode(lat: number, lng: number, label: string) {
-    if (this.geoPin) this.geoPin.el.remove();
-    this.geoPin = this.makeDomPin({ kind: "geocode", lat, lng, label });
-    this.labelsEl.appendChild(this.geoPin.el);
+    if (this.geoMarker) {
+      this.scene.remove(this.geoMarker);
+      this.geoMarker.material.dispose();
+      this.geoMarker = null;
+    }
+    const mat = new THREE.SpriteMaterial({
+      map: getDiamondTexture(),
+      transparent: true,
+      depthTest: true,
+      depthWrite: false,
+      sizeAttenuation: true,
+      color: 0xffffff,
+    });
+    const sprite = new THREE.Sprite(mat);
+    latLngToVec(lat, lng, GLOBE_R * 1.014, _tmp);
+    sprite.position.copy(_tmp);
+    sprite.scale.setScalar(0.055);
+    this.scene.add(sprite);
+    this.geoMarker = sprite;
+    this.geoPick = { kind: "geocode", lat, lng, label };
   }
 
   suppressPicks(ms = 400) {
@@ -539,25 +577,19 @@ export class WonderGlobe {
 
   setPresentation(mode: "hero" | "map") {
     const hero = mode === "hero";
-    const nextQuality = mode;
-    const qualityChange = this.drawQuality !== nextQuality;
+    const changed = this.presentation !== mode;
     this.presentation = mode;
-    this.drawQuality = nextQuality;
     this.controls.enabled = !hero;
     this.controls.enableRotate = !hero;
     this.controls.enableZoom = !hero;
     this.canvas.style.pointerEvents = hero ? "none" : "auto";
     this.canvas.style.cursor = hero ? "default" : "grab";
-    this.labelsEl.style.opacity = "1";
-    this.labelsEl.style.display = "block";
-    this.labelsEl.style.pointerEvents = "none";
     if (hero) {
       this.holdIdle = false;
       if (!this.reducedMotion) this.controls.autoRotate = true;
     }
-    if (this.landmarks.length && this.domPins.length === 0) this.rebuildMarkers();
-    if (qualityChange) this.sizeRenderer();
-    if (this.domPins.length || this.geoPin) this.layoutPins();
+    if (this.landmarks.length && !this.pinPoints) this.rebuildMarkers();
+    if (changed) this.sizeRenderer();
   }
 
   attach(container: HTMLElement) {
@@ -565,7 +597,6 @@ export class WonderGlobe {
     this.ro.unobserve(this.container);
     this.container = container;
     container.appendChild(this.canvas);
-    container.appendChild(this.labelsEl);
     this.ro.observe(container);
     this.sizeRenderer();
   }
@@ -616,8 +647,13 @@ export class WonderGlobe {
       if (obj instanceof THREE.LineSegments) obj.geometry.dispose();
     });
     for (const mat of this.borderMats) mat.dispose();
+    this.clearPins();
+    if (this.geoMarker) {
+      this.scene.remove(this.geoMarker);
+      this.geoMarker.material.dispose();
+      this.geoMarker = null;
+    }
     this.renderer.dispose();
-    this.labelsEl.remove();
     this.canvas.remove();
   }
 
@@ -674,65 +710,82 @@ export class WonderGlobe {
     return !!f && f.name === lm.name && Math.abs(f.lat - lm.lat) < 1e-5 && Math.abs(f.lng - lm.lng) < 1e-5;
   }
 
-  private makeDomPin(data: MarkerPick): DomPin {
-    const el = makePinEl();
-    el.setAttribute("aria-label", data.landmark?.name ?? data.label ?? "Pin");
-    el.addEventListener("pointerdown", (e) => e.stopPropagation());
-    el.addEventListener("click", (e) => {
-      e.stopPropagation();
-      this.selected = data;
-      this.handlers.onPick(data);
-    });
-    el.addEventListener("pointerenter", () => {
-      this.hovered = data;
-      this.handlers.onHover(data);
-    });
-    el.addEventListener("pointerleave", () => {
-      if (this.hovered === data) {
-        this.hovered = null;
-        this.handlers.onHover(null);
-      }
-    });
-    return { el, lat: data.lat, lng: data.lng, data };
+  private clearPins() {
+    if (this.pinPoints) {
+      this.scene.remove(this.pinPoints);
+      this.pinPoints.geometry.dispose();
+      (this.pinPoints.material as THREE.Material).dispose();
+      this.pinPoints = null;
+    }
+    this.pinColors = null;
+    this.pinPicks = [];
   }
 
   private rebuildMarkers() {
-    this.labelsEl.replaceChildren();
-    this.domPins = [];
+    this.clearPins();
     this.selected = null;
-    const frag = document.createDocumentFragment();
-    for (const lm of this.landmarks) {
-      const pin = this.makeDomPin({ kind: "pin", lat: lm.lat, lng: lm.lng, landmark: lm });
-      this.domPins.push(pin);
-      frag.appendChild(pin.el);
-      if (this.focusLandmark && this.isFocus(lm)) this.selected = pin.data;
+    const n = this.landmarks.length;
+    if (!n) return;
+    const pos = new Float32Array(n * 3);
+    const col = new Float32Array(n * 3);
+    this.pinPicks = [];
+    for (let i = 0; i < n; i++) {
+      const lm = this.landmarks[i];
+      latLngToVec(lm.lat, lm.lng, GLOBE_R * 1.012, _tmp);
+      pos[i * 3] = _tmp.x;
+      pos[i * 3 + 1] = _tmp.y;
+      pos[i * 3 + 2] = _tmp.z;
+      col[i * 3] = 0.92;
+      col[i * 3 + 1] = 0.94;
+      col[i * 3 + 2] = 0.97;
+      const data: MarkerPick = { kind: "pin", lat: lm.lat, lng: lm.lng, landmark: lm };
+      this.pinPicks.push(data);
+      if (this.focusLandmark && this.isFocus(lm)) this.selected = data;
     }
-    this.labelsEl.appendChild(frag);
-    if (this.geoPin) this.labelsEl.appendChild(this.geoPin.el);
-    this.layoutPins();
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    const colors = new THREE.Float32BufferAttribute(col, 3);
+    geo.setAttribute("color", colors);
+    this.pinColors = colors;
+    const mat = new THREE.PointsMaterial({
+      map: getDiamondTexture(),
+      vertexColors: true,
+      transparent: true,
+      depthTest: true,
+      depthWrite: false,
+      size: 14,
+      sizeAttenuation: false,
+      alphaTest: 0.2,
+    });
+    this.pinPoints = new THREE.Points(geo, mat);
+    this.pinPoints.renderOrder = 4;
+    this.scene.add(this.pinPoints);
+    this.tintPins();
   }
 
-  private layoutPins() {
-    const dist = this.camera.position.length();
-    const t = THREE.MathUtils.inverseLerp(MAX_DIST, MIN_DIST, dist);
-    const size = THREE.MathUtils.lerp(16, 36, THREE.MathUtils.clamp(t, 0, 1));
-    const layout = (pin: DomPin) => {
-      const pos = this.project(pin.lat, pin.lng, 0.01);
-      if (!pos || !pos.visible) {
-        if (pin.el.style.display !== "none") pin.el.style.display = "none";
-        return;
-      }
-      const on = this.selected === pin.data || this.hovered === pin.data;
-      const px = on ? size * 1.18 : size;
-      pin.el.style.display = "block";
-      pin.el.style.width = `${px}px`;
-      pin.el.style.height = `${px}px`;
-      pin.el.style.transform = `translate(${pos.x}px, ${pos.y}px) translate(-50%, -50%)`;
-      pin.el.classList.toggle("is-on", this.selected === pin.data);
-      pin.el.classList.toggle("is-hover", this.hovered === pin.data);
-    };
-    for (const pin of this.domPins) layout(pin);
-    if (this.geoPin) layout(this.geoPin);
+  private tintPins() {
+    if (!this.pinColors) return;
+    const arr = this.pinColors.array as Float32Array;
+    for (let i = 0; i < this.pinPicks.length; i++) {
+      const on = this.selected === this.pinPicks[i] || this.hovered === this.pinPicks[i];
+      const v = on ? 1 : 0.82;
+      arr[i * 3] = v;
+      arr[i * 3 + 1] = v;
+      arr[i * 3 + 2] = on ? 1 : 0.9;
+    }
+    this.pinColors.needsUpdate = true;
+  }
+
+  private hitPin(clientX: number, clientY: number): MarkerPick | null {
+    if (!this.pinPoints || this.presentation !== "map") return null;
+    const rect = this.canvas.getBoundingClientRect();
+    this.pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    this.pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    this.raycaster.setFromCamera(this.pointer, this.camera);
+    const hits = this.raycaster.intersectObject(this.pinPoints, false);
+    const idx = hits[0]?.index;
+    if (idx == null) return null;
+    return this.pinPicks[idx] ?? null;
   }
 
   private hitEarth(clientX: number, clientY: number): THREE.Intersection | null {
@@ -776,21 +829,41 @@ export class WonderGlobe {
   };
 
   private onPointerUp = (e: PointerEvent) => {
-    this.canvas.style.cursor = "grab";
+    this.canvas.style.cursor = this.hovered ? "pointer" : "grab";
     if (this.flying) return;
     if (performance.now() < this.ignorePickUntil) return;
     if (Math.hypot(e.clientX - this.downX, e.clientY - this.downY) > 7) return;
+    const pin = this.hitPin(e.clientX, e.clientY);
+    if (pin) {
+      this.selected = pin;
+      this.tintPins();
+      this.handlers.onPick(pin);
+      return;
+    }
     this.selected = null;
+    this.tintPins();
     this.handlers.onPick(null);
     const earth = this.hitEarth(e.clientX, e.clientY);
     if (earth) this.spawnRipple(earth.point);
   };
 
-  private onPointerMove = () => {
-    this.canvas.style.cursor = "grab";
+  private onPointerMove = (e: PointerEvent) => {
+    if (this.presentation !== "map" || this.flying) return;
+    const pin = this.hitPin(e.clientX, e.clientY);
+    if (pin !== this.hovered) {
+      this.hovered = pin;
+      this.tintPins();
+      this.handlers.onHover(pin);
+    }
+    this.canvas.style.cursor = pin ? "pointer" : "grab";
   };
 
   private onPointerLeave = () => {
+    if (this.hovered) {
+      this.hovered = null;
+      this.tintPins();
+      this.handlers.onHover(null);
+    }
     this.canvas.style.cursor = "grab";
   };
 
@@ -829,11 +902,6 @@ export class WonderGlobe {
       }
     }
 
-    this.pinAge += dt;
-    if ((this.domPins.length || this.geoPin) && this.pinAge > 0.033) {
-      this.pinAge = 0;
-      this.layoutPins();
-    }
     this.fadeBorders();
     this.renderer.render(this.scene, this.camera);
   };
@@ -841,22 +909,6 @@ export class WonderGlobe {
 
 let sharedGlobe: WonderGlobe | null = null;
 let globeUsers = 0;
-let pinNode: HTMLButtonElement | null = null;
-
-function makePinEl(): HTMLButtonElement {
-  if (!pinNode) {
-    pinNode = document.createElement("button");
-    pinNode.type = "button";
-    pinNode.className = "globe-pin";
-    const shape = document.createElement("span");
-    shape.className = "globe-pin-shape";
-    const core = document.createElement("span");
-    core.className = "globe-pin-core";
-    shape.appendChild(core);
-    pinNode.appendChild(shape);
-  }
-  return pinNode.cloneNode(true) as HTMLButtonElement;
-}
 
 export function acquireGlobe(container: HTMLElement, handlers: GlobeHandlers): WonderGlobe {
   globeUsers += 1;

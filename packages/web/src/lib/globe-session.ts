@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { useNavigate } from "@tanstack/react-router";
 import type { Landmark } from "./landmarks";
 import type { WonderGlobe } from "./globe-engine";
+import { prefersReducedMotion } from "./globe-morph";
 
 export type GlobeMode = "hero" | "opening" | "map" | "closing";
 
@@ -24,8 +25,6 @@ type GlobeSession = {
   setReady: (ready: boolean) => void;
 };
 
-export const OPEN_MAP_MS = 920;
-
 export const useGlobeSession = create<GlobeSession>((set) => ({
   mode: "hero",
   slot: null,
@@ -46,16 +45,12 @@ export function useOpenMap() {
 
   return () => {
     if (mode === "opening" || mode === "map") return;
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduce) {
+    if (prefersReducedMotion()) {
       setMode("map");
       void navigate({ to: "/map" });
       return;
     }
     setMode("opening");
-    window.setTimeout(() => {
-      void navigate({ to: "/map" });
-    }, OPEN_MAP_MS);
   };
 }
 
@@ -69,16 +64,12 @@ export function useCloseMap() {
       void navigate({ to: "/" });
       return;
     }
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduce) {
+    if (prefersReducedMotion()) {
       setMode("hero");
       void navigate({ to: "/" });
       return;
     }
     setMode("closing");
     void navigate({ to: "/" });
-    window.setTimeout(() => {
-      useGlobeSession.getState().setMode("hero");
-    }, OPEN_MAP_MS);
   };
 }

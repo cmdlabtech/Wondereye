@@ -1,21 +1,22 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { useRouterState } from "@tanstack/react-router";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
 import type { WonderGlobe } from "@/lib/globe-engine";
 import { loadLandmarks, type Landmark } from "@/lib/landmarks";
 import { useGlobeSession } from "@/lib/globe-session";
+import { applyHeroFrame, applyMapFrame, animateToHero, animateToMap } from "@/lib/globe-morph";
 import { warmEarthImage } from "@/lib/globe-types";
 import { cn } from "@/lib/cn";
 
 warmEarthImage();
 
 const noop = () => {};
-const GLOBE_SCREEN_K = 0.346;
 
 export function GlobeHost() {
+  const frameRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const globeRef = useRef<WonderGlobe | null>(null);
+  const animRef = useRef<Animation | null>(null);
   const [painted, setPainted] = useState(false);
-  const [view, setView] = useState({ w: 1280, h: 800 });
   const mode = useGlobeSession((s) => s.mode);
   const slot = useGlobeSession((s) => s.slot);
   const setGlobe = useGlobeSession((s) => s.setGlobe);
@@ -23,10 +24,12 @@ export function GlobeHost() {
   const setReady = useGlobeSession((s) => s.setReady);
   const setMode = useGlobeSession((s) => s.setMode);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const navigate = useNavigate();
   const modeRef = useRef(mode);
   modeRef.current = mode;
+  const openFromSlot = useRef(slot);
+  if (mode === "hero" && slot) openFromSlot.current = slot;
 
-  const expanded = mode === "opening" || mode === "map";
   const live = mode === "map";
   const morphing = mode === "opening" || mode === "closing";
 
@@ -80,48 +83,86 @@ export function GlobeHost() {
     };
   }, [setGlobe, setLandmarks, setReady]);
 
-  useEffect(() => {
-    globeRef.current?.setPresentation(mode === "map" ? "map" : "hero");
-  }, [mode]);
-
   useLayoutEffect(() => {
-    const measure = () => setView({ w: window.innerWidth, h: window.innerHeight });
-    measure();
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
-  }, []);
+    const frame = frameRef.current;
+    if (!frame) return;
+    if (mode === "map") {
+      applyMapFrame(frame);
+      globeRef.current?.setPresentation("map");
+      return;
+    }
+    if (mode === "hero" && slot) {
+      applyHeroFrame(frame, slot);
+      globeRef.current?.setPresentation("hero");
+    }
+  }, [mode, slot]);
 
-  const s = slot?.r ?? 0;
-  const globeR = Math.max(24, GLOBE_SCREEN_K * view.h);
-  const heroScale = s > 0 ? (s * 0.72) / globeR : 0.55;
-  const tx = slot ? slot.x - view.w / 2 : 0;
-  const ty = slot ? slot.y - view.h / 2 : 0;
-  const clip = expanded
-    ? `circle(${Math.hypot(view.w, view.h)}px at ${view.w / 2}px ${view.h / 2}px)`
-    : slot
-      ? `circle(${s}px at ${slot.x}px ${slot.y}px)`
-      : undefined;
+  useEffect(() => {
+    const frame = frameRef.current;
+    const from = openFromSlot.current;
+    if (!frame || mode !== "opening" || !from) return;
+
+    animRef.current?.cancel();
+    globeRef.current?.setPresentation("hero");
+    const anim = animateToMap(frame, from);
+    animRef.current = anim;
+    let alive = true;
+    void anim.finished.then(
+      () => {
+        if (!alive) return;
+        applyMapFrame(frame);
+        anim.cancel();
+        globeRef.current?.setPresentation("map");
+        void navigate({ to: "/map" });
+      },
+      () => {},
+    );
+    return () => {
+      alive = false;
+      anim.cancel();
+    };
+  }, [mode, navigate]);
+
+  useEffect(() => {
+    const frame = frameRef.current;
+    if (!frame || mode !== "closing" || !slot) return;
+
+    animRef.current?.cancel();
+    globeRef.current?.setPresentation("hero");
+    const anim = animateToHero(frame, slot);
+    animRef.current = anim;
+    let alive = true;
+    void anim.finished.then(
+      () => {
+        if (!alive) return;
+        applyHeroFrame(frame, slot);
+        anim.cancel();
+        globeRef.current?.setPresentation("hero");
+        setMode("hero");
+      },
+      () => {},
+    );
+    return () => {
+      alive = false;
+      anim.cancel();
+    };
+  }, [mode, slot, setMode]);
+
+  const show = painted && (live || !!slot);
 
   return (
     <div
+      ref={frameRef}
       className={cn(
         "globe-frame",
         live && "is-live",
-        expanded && "is-expanded",
-        morphing && "is-opening",
-        morphing && "can-anim",
-        painted && (live || !!slot) && "is-painted",
+        morphing && "is-morphing",
+        mode === "hero" && "is-hero",
+        show && "is-painted",
       )}
-      style={clip ? { clipPath: clip } : undefined}
       aria-hidden={mode === "hero" || mode === "opening"}
     >
-      <div
-        ref={stageRef}
-        className={cn("globe-host", morphing && "can-anim")}
-        style={{
-          transform: expanded || !slot ? "none" : `translate(${tx}px, ${ty}px) scale(${heroScale})`,
-        }}
-      />
+      <div ref={stageRef} className="globe-host" />
     </div>
   );
 }
