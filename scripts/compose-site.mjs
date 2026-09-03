@@ -1,5 +1,5 @@
 import { execSync } from "node:child_process";
-import { cpSync, existsSync, readdirSync } from "node:fs";
+import { cpSync, existsSync, readdirSync, rmSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -21,5 +21,8 @@ for (const name of readdirSync(webDist)) {
   if (name === "assets" || name === "index.html") continue;
   cpSync(join(webDist, name), join(frontDist, name));
 }
+
+const oldMap = join(frontDist, "map.html");
+if (existsSync(oldMap)) rmSync(oldMap);
 
 console.log("Composed globe SPA over frontend dist (app.html preserved).");
