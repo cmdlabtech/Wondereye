@@ -176,6 +176,7 @@
     pointer-events: none;
     opacity: 0;
     background: #000;
+    transform-origin: 50% 50%;
   }
 
   .globe-frame.is-painted {
@@ -184,6 +185,7 @@
 
   .globe-frame.is-morphing {
     z-index: 30;
+    will-change: transform, clip-path;
   }
 
   .globe-frame.is-hero {
@@ -249,7 +251,11 @@
 
   html.globe-on .hero-orb {
     background-image: none;
-    background-color: transparent;
+    background-color: #000;
+  }
+
+  .is-leaving .hero-orb {
+    opacity: 0;
   }
 
 }

@@ -86,6 +86,7 @@ export function GlobeHost() {
   useLayoutEffect(() => {
     const frame = frameRef.current;
     if (!frame) return;
+    if (morphing) return;
     if (mode === "map") {
       applyMapFrame(frame);
       globeRef.current?.setPresentation("map");
@@ -95,15 +96,19 @@ export function GlobeHost() {
       applyHeroFrame(frame, slot);
       globeRef.current?.setPresentation("hero");
     }
-  }, [mode, slot]);
+  }, [mode, slot, morphing]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const frame = frameRef.current;
     const from = openFromSlot.current;
     if (!frame || mode !== "opening" || !from) return;
+    const globe = globeRef.current;
 
     animRef.current?.cancel();
-    globeRef.current?.setPresentation("hero");
+    applyMapFrame(frame);
+    globe?.setResizePaused(false);
+    globe?.setPresentation("map", { interactive: false });
+    globe?.setResizePaused(true);
     const anim = animateToMap(frame, from);
     animRef.current = anim;
     let alive = true;
@@ -112,6 +117,7 @@ export function GlobeHost() {
         if (!alive) return;
         applyMapFrame(frame);
         anim.cancel();
+        globeRef.current?.setResizePaused(false);
         globeRef.current?.setPresentation("map");
         void navigate({ to: "/map" });
       },
@@ -120,15 +126,18 @@ export function GlobeHost() {
     return () => {
       alive = false;
       anim.cancel();
+      globeRef.current?.setResizePaused(false);
     };
   }, [mode, navigate]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const frame = frameRef.current;
     if (!frame || mode !== "closing" || !slot) return;
+    const globe = globeRef.current;
 
     animRef.current?.cancel();
-    globeRef.current?.setPresentation("hero");
+    globe?.setResizePaused(true);
+    globe?.setPresentation("map", { interactive: false });
     const anim = animateToHero(frame, slot);
     animRef.current = anim;
     let alive = true;
@@ -137,6 +146,7 @@ export function GlobeHost() {
         if (!alive) return;
         applyHeroFrame(frame, slot);
         anim.cancel();
+        globeRef.current?.setResizePaused(false);
         globeRef.current?.setPresentation("hero");
         setMode("hero");
       },
@@ -145,10 +155,11 @@ export function GlobeHost() {
     return () => {
       alive = false;
       anim.cancel();
+      globeRef.current?.setResizePaused(false);
     };
   }, [mode, slot, setMode]);
 
-  const show = painted && (live || !!slot);
+  const show = painted && (live || !!slot || morphing);
 
   return (
     <div

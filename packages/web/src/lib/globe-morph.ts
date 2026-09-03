@@ -14,8 +14,11 @@ export function applyHeroFrame(el: HTMLElement, slot: GlobeSlot) {
   el.style.top = `${slot.y - d / 2}px`;
   el.style.width = `${d}px`;
   el.style.height = `${d}px`;
+  el.style.right = "auto";
+  el.style.bottom = "auto";
   el.style.borderRadius = "50%";
   el.style.transform = "none";
+  el.style.clipPath = "none";
 }
 
 export function applyMapFrame(el: HTMLElement) {
@@ -27,66 +30,51 @@ export function applyMapFrame(el: HTMLElement) {
   el.style.height = "auto";
   el.style.borderRadius = "0";
   el.style.transform = "none";
+  el.style.clipPath = "none";
 }
 
-function lockBox(el: HTMLElement) {
-  const r = el.getBoundingClientRect();
-  el.style.inset = "auto";
-  el.style.left = `${r.left}px`;
-  el.style.top = `${r.top}px`;
-  el.style.width = `${r.width}px`;
-  el.style.height = `${r.height}px`;
-  el.style.right = "auto";
-  el.style.bottom = "auto";
-  return r;
+function invertFromOrb(slot: GlobeSlot) {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const s = (slot.r * 2) / vh;
+  return {
+    transform: `translate(${slot.x - vw / 2}px, ${slot.y - vh / 2}px) scale(${s})`,
+    clipPath: `circle(${vh / 2}px at 50% 50%)`,
+  };
+}
+
+function mapRest() {
+  const cover = Math.hypot(window.innerWidth, window.innerHeight);
+  return {
+    transform: "translate(0px, 0px) scale(1)",
+    clipPath: `circle(${cover}px at 50% 50%)`,
+  };
 }
 
 export function animateToMap(el: HTMLElement, slot: GlobeSlot): Animation {
-  const d = Math.max(8, slot.r * 2);
+  applyMapFrame(el);
   const reduce = prefersReducedMotion();
-  applyHeroFrame(el, slot);
-  return el.animate(
-    [
-      {
-        left: `${slot.x - d / 2}px`,
-        top: `${slot.y - d / 2}px`,
-        width: `${d}px`,
-        height: `${d}px`,
-        borderRadius: "50%",
-      },
-      {
-        left: "0px",
-        top: "0px",
-        width: `${window.innerWidth}px`,
-        height: `${window.innerHeight}px`,
-        borderRadius: "0px",
-      },
-    ],
-    { duration: reduce ? 0 : MORPH_MS, easing: MORPH_EASE, fill: "forwards" },
-  );
+  const from = invertFromOrb(slot);
+  const to = mapRest();
+  el.style.transform = from.transform;
+  el.style.clipPath = from.clipPath;
+  return el.animate([from, to], {
+    duration: reduce ? 0 : MORPH_MS,
+    easing: MORPH_EASE,
+    fill: "forwards",
+  });
 }
 
 export function animateToHero(el: HTMLElement, slot: GlobeSlot): Animation {
-  const d = Math.max(8, slot.r * 2);
+  applyMapFrame(el);
   const reduce = prefersReducedMotion();
-  lockBox(el);
-  return el.animate(
-    [
-      {
-        left: el.style.left,
-        top: el.style.top,
-        width: el.style.width,
-        height: el.style.height,
-        borderRadius: "0px",
-      },
-      {
-        left: `${slot.x - d / 2}px`,
-        top: `${slot.y - d / 2}px`,
-        width: `${d}px`,
-        height: `${d}px`,
-        borderRadius: "50%",
-      },
-    ],
-    { duration: reduce ? 0 : MORPH_MS, easing: MORPH_EASE, fill: "forwards" },
-  );
+  const from = mapRest();
+  const to = invertFromOrb(slot);
+  el.style.transform = from.transform;
+  el.style.clipPath = from.clipPath;
+  return el.animate([from, to], {
+    duration: reduce ? 0 : MORPH_MS,
+    easing: MORPH_EASE,
+    fill: "forwards",
+  });
 }

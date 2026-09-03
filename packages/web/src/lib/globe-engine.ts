@@ -154,7 +154,7 @@ let diamondTex: THREE.CanvasTexture | null = null;
 function getDiamondTexture(): THREE.CanvasTexture {
   if (diamondTex) return diamondTex;
   const c = document.createElement("canvas");
-  c.width = c.height = 64;
+  c.width = c.height = 128;
   const g = c.getContext("2d");
   if (!g) {
     diamondTex = new THREE.CanvasTexture(c);
@@ -162,20 +162,20 @@ function getDiamondTexture(): THREE.CanvasTexture {
   }
   const diamond = (inset: number) => {
     g.beginPath();
-    g.moveTo(32, inset);
-    g.lineTo(64 - inset, 32);
-    g.lineTo(32, 64 - inset);
-    g.lineTo(inset, 32);
+    g.moveTo(64, inset);
+    g.lineTo(128 - inset, 64);
+    g.lineTo(64, 128 - inset);
+    g.lineTo(inset, 64);
     g.closePath();
   };
-  g.strokeStyle = "rgba(255,255,255,0.92)";
-  g.lineWidth = 3.5;
+  g.strokeStyle = "rgba(255,255,255,0.95)";
+  g.lineWidth = 8;
   diamond(8);
   g.stroke();
-  g.fillStyle = "rgba(255,255,255,0.22)";
-  g.strokeStyle = "rgba(255,255,255,0.5)";
-  g.lineWidth = 2;
-  diamond(20);
+  g.fillStyle = "rgba(255,255,255,0.28)";
+  g.strokeStyle = "rgba(255,255,255,0.55)";
+  g.lineWidth = 5;
+  diamond(32);
   g.fill();
   g.stroke();
   diamondTex = new THREE.CanvasTexture(c);
@@ -263,6 +263,7 @@ export class WonderGlobe {
   private painted = false;
   private lastTick = 0;
   private holdIdle = false;
+  private resizePaused = false;
 
   get ready() {
     return this.painted;
@@ -343,7 +344,7 @@ export class WonderGlobe {
       this.lastInput = performance.now();
     });
 
-    this.raycaster.params.Points = { threshold: 0.04 };
+    this.raycaster.params.Points = { threshold: 0.07 };
     this.canvas.addEventListener("pointerdown", this.onPointerDown);
     this.canvas.addEventListener("pointerup", this.onPointerUp);
     this.canvas.addEventListener("pointermove", this.onPointerMove);
@@ -369,7 +370,13 @@ export class WonderGlobe {
 
   private ro = new ResizeObserver(() => this.sizeRenderer());
 
+  setResizePaused(paused: boolean) {
+    this.resizePaused = paused;
+    if (!paused) this.sizeRenderer();
+  }
+
   private sizeRenderer() {
+    if (this.resizePaused) return;
     const w = Math.max(1, this.container.clientWidth);
     const h = Math.max(1, this.container.clientHeight);
     this.camera.aspect = w / h;
@@ -377,6 +384,14 @@ export class WonderGlobe {
     const dpr = Math.min(window.devicePixelRatio || 1, this.presentation === "hero" ? 1 : 2);
     this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(w, h, false);
+    this.syncPinSize();
+  }
+
+  private syncPinSize() {
+    if (!this.pinPoints) return;
+    const mat = this.pinPoints.material as THREE.PointsMaterial;
+    const minSide = Math.min(this.container.clientWidth, this.container.clientHeight);
+    mat.size = THREE.MathUtils.clamp(minSide * 0.05, 26, 32);
   }
 
   private async loadBorders(kind: "c" | "s") {
@@ -549,7 +564,7 @@ export class WonderGlobe {
     const sprite = new THREE.Sprite(mat);
     latLngToVec(lat, lng, GLOBE_R * 1.014, _tmp);
     sprite.position.copy(_tmp);
-    sprite.scale.setScalar(0.055);
+    sprite.scale.setScalar(0.09);
     this.scene.add(sprite);
     this.geoMarker = sprite;
     this.geoPick = { kind: "geocode", lat, lng, label };
@@ -575,15 +590,16 @@ export class WonderGlobe {
     return this.controls.autoRotate;
   }
 
-  setPresentation(mode: "hero" | "map") {
+  setPresentation(mode: "hero" | "map", opts?: { interactive?: boolean }) {
     const hero = mode === "hero";
+    const interactive = opts?.interactive ?? !hero;
     const changed = this.presentation !== mode;
     this.presentation = mode;
-    this.controls.enabled = !hero;
-    this.controls.enableRotate = !hero;
-    this.controls.enableZoom = !hero;
-    this.canvas.style.pointerEvents = hero ? "none" : "auto";
-    this.canvas.style.cursor = hero ? "default" : "grab";
+    this.controls.enabled = interactive;
+    this.controls.enableRotate = interactive;
+    this.controls.enableZoom = interactive;
+    this.canvas.style.pointerEvents = interactive ? "auto" : "none";
+    this.canvas.style.cursor = interactive ? "grab" : "default";
     if (hero) {
       this.holdIdle = false;
       if (!this.reducedMotion) this.controls.autoRotate = true;
@@ -753,13 +769,14 @@ export class WonderGlobe {
       transparent: true,
       depthTest: true,
       depthWrite: false,
-      size: 14,
+      size: 28,
       sizeAttenuation: false,
       alphaTest: 0.2,
     });
     this.pinPoints = new THREE.Points(geo, mat);
     this.pinPoints.renderOrder = 4;
     this.scene.add(this.pinPoints);
+    this.syncPinSize();
     this.tintPins();
   }
 
