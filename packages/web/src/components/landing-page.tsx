@@ -23,6 +23,7 @@ export function LandingPage() {
   const slotRef = useRef<HTMLButtonElement>(null);
   const setSlot = useGlobeSession((s) => s.setSlot);
   const mode = useGlobeSession((s) => s.mode);
+  const ready = useGlobeSession((s) => s.ready);
   const count = useGlobeSession((s) => s.landmarks.length);
   const openMap = useOpenMap();
   const leaving = mode === "opening";
@@ -62,7 +63,7 @@ export function LandingPage() {
       <header className="landing-leave sticky top-0 z-20 border-b border-border bg-bg px-4 py-3 sm:px-6">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
           <Wordmark />
-          <button type="button" className="btn btn-solid pr-3.5" onClick={openMap}>
+          <button type="button" className="btn btn-solid pr-3.5" onClick={openMap} disabled={!ready}>
             Open the map
             <ArrowRight className="size-4" />
           </button>
@@ -84,7 +85,7 @@ export function LandingPage() {
                 Search a place, spin the earth, land on the story. White diamonds mark the notes.
               </p>
               <div className="rise rise-4 mt-8 flex flex-wrap items-center gap-3">
-                <button type="button" className="btn btn-solid pr-3.5" onClick={openMap}>
+                <button type="button" className="btn btn-solid pr-3.5" onClick={openMap} disabled={!ready}>
                   Open the map
                   <ArrowRight className="size-4" />
                 </button>
@@ -99,8 +100,9 @@ export function LandingPage() {
                 ref={slotRef}
                 type="button"
                 onClick={openMap}
+                disabled={!ready}
                 className="hero-orb bg-transparent"
-                aria-label="Open the map"
+                aria-label={ready ? "Open the map" : "Lighting the globe"}
               />
               <p className="landing-leave relative z-20 mt-5 flex items-center justify-center gap-2.5 text-xs tracking-[0.2em] text-muted uppercase tabular-nums">
                 <PinIcon className="size-2 text-fg" />

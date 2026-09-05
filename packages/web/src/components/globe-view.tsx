@@ -11,6 +11,8 @@ export function GlobeView() {
   const globe = useGlobeSession((s) => s.globe);
   const landmarks = useGlobeSession((s) => s.landmarks);
   const ready = useGlobeSession((s) => s.ready);
+  const opening = useGlobeSession((s) => s.mode === "opening");
+  const chromeZ = opening ? "z-20" : "z-30";
   const closeMap = useCloseMap();
   const popupRef = useRef<HTMLDivElement>(null);
   const hoverTipRef = useRef<HTMLDivElement>(null);
@@ -177,7 +179,7 @@ export function GlobeView() {
   return (
     <div className="pointer-events-none">
 
-      <header className="map-chrome-enter pointer-events-none fixed inset-x-0 top-0 z-30 p-3 sm:p-4">
+      <header className={cn("map-chrome-enter pointer-events-none fixed inset-x-0 top-0 p-3 sm:p-4", chromeZ)}>
         <div className="mx-auto flex max-w-5xl items-center gap-2 sm:gap-3">
           <div className="pointer-events-auto hidden min-w-0 shrink-0 sm:block">
             <Wordmark
@@ -334,7 +336,7 @@ export function GlobeView() {
         ) : null}
       </div>
 
-      <p className="map-chrome-enter pointer-events-none fixed bottom-3 left-3 z-30 px-2 py-1 text-xs text-muted">
+      <p className={cn("map-chrome-enter pointer-events-none fixed bottom-3 left-3 px-2 py-1 text-xs text-muted", chromeZ)}>
         Drag to orbit · scroll to zoom · click a pin
       </p>
     </div>

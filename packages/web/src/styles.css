@@ -23,6 +23,7 @@
   --shadow-ring-hover: 0 0 0 1px #ffffff47;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-morph: cubic-bezier(0.65, 0, 0.35, 1);
 }
 
 @layer base {
@@ -87,6 +88,11 @@
 
   .btn:active:not(:disabled) {
     transform: scale(0.96);
+  }
+
+  .btn:disabled {
+    opacity: 0.45;
+    cursor: default;
   }
 
   .btn-solid {
@@ -183,18 +189,19 @@
     opacity: 1;
   }
 
-  .globe-frame.is-morphing {
-    z-index: 30;
-    will-change: transform, clip-path;
-  }
-
   .globe-frame.is-hero {
     z-index: 4;
+    will-change: transform;
   }
 
   .globe-frame.is-live {
     z-index: 1;
     pointer-events: auto;
+  }
+
+  .globe-frame.is-morphing {
+    z-index: 30;
+    will-change: transform;
   }
 
   .globe-host {
@@ -212,9 +219,7 @@
   }
 
   .landing-leave {
-    transition:
-      opacity 720ms var(--ease-out),
-      transform 720ms var(--ease-out);
+    transition: opacity 1300ms var(--ease-morph);
   }
 
   .is-leaving {
@@ -223,35 +228,43 @@
 
   .is-leaving .landing-leave {
     opacity: 0;
-    transform: translateX(-3.25rem);
     pointer-events: none;
   }
 
-  .is-leaving .landing-leave-slow {
-    transform: translateY(1.25rem);
-  }
-
   .map-chrome-enter {
-    animation: rise 400ms var(--ease-out) both;
+    animation: fade-in 700ms 80ms var(--ease-morph) both;
   }
 
   .hero-orb {
     display: block;
+    position: relative;
+    z-index: 5;
     aspect-ratio: 1;
     width: 100%;
     padding: 0;
     border: 0;
     border-radius: 50%;
     background-color: #000;
-    background-image: radial-gradient(circle at 35% 32%, #3a6ea8 0%, #16365f 38%, #081018 64%, #000 78%);
+    background-image: radial-gradient(circle at 32% 28%, #4a4a4a 0%, #1a1a1a 28%, #0a0a0a 54%, #000 76%);
+    box-shadow: var(--shadow-ring);
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
     appearance: none;
+    transition: opacity 1300ms var(--ease-morph);
+  }
+
+  .hero-orb:hover:not(:disabled) {
+    box-shadow: var(--shadow-ring-hover);
+  }
+
+  .hero-orb:disabled {
+    cursor: default;
+    opacity: 1;
   }
 
   html.globe-on .hero-orb {
     background-image: none;
-    background-color: #000;
+    background-color: transparent;
   }
 
   .is-leaving .hero-orb {
@@ -268,6 +281,15 @@
   to {
     opacity: 1;
     transform: none;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }
 

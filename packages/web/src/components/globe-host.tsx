@@ -9,6 +9,7 @@ import { cn } from "@/lib/cn";
 
 warmEarthImage();
 
+const globeEngine = import("@/lib/globe-engine");
 const noop = () => {};
 
 export function GlobeHost() {
@@ -17,6 +18,7 @@ export function GlobeHost() {
   const globeRef = useRef<WonderGlobe | null>(null);
   const animRef = useRef<Animation | null>(null);
   const [painted, setPainted] = useState(false);
+  const [mapLive, setMapLive] = useState(false);
   const mode = useGlobeSession((s) => s.mode);
   const slot = useGlobeSession((s) => s.slot);
   const setGlobe = useGlobeSession((s) => s.setGlobe);
@@ -30,15 +32,19 @@ export function GlobeHost() {
   const openFromSlot = useRef(slot);
   if (mode === "hero" && slot) openFromSlot.current = slot;
 
-  const live = mode === "map";
+  const live = mode === "map" || (mode === "opening" && mapLive);
   const morphing = mode === "opening" || mode === "closing";
 
   useEffect(() => {
     if (pathname === "/map") {
+      if (mode === "opening" || mode === "closing") return;
       if (mode !== "map") setMode("map");
       return;
     }
-    if (pathname === "/" && mode === "map") setMode("hero");
+    if (pathname === "/") {
+      if (mode === "opening" || mode === "closing") return;
+      if (mode === "map") setMode("hero");
+    }
   }, [pathname, mode, setMode]);
 
   useEffect(() => {
@@ -48,7 +54,7 @@ export function GlobeHost() {
     let globe: WonderGlobe | null = null;
     let release: ((g: WonderGlobe) => void) | null = null;
 
-    void import("@/lib/globe-engine").then(({ acquireGlobe, releaseGlobe }) => {
+    void globeEngine.then(({ acquireGlobe, releaseGlobe }) => {
       if (!alive || !stageRef.current) return;
       release = releaseGlobe;
       globe = acquireGlobe(stageRef.current, {
@@ -60,8 +66,8 @@ export function GlobeHost() {
           setReady(true);
         },
       });
-      globe.setPresentation(modeRef.current === "map" ? "map" : "hero");
       globeRef.current = globe;
+      globe.setPresentation(modeRef.current === "map" ? "map" : "hero");
       setGlobe(globe);
       (window as unknown as { __wonderGlobe?: WonderGlobe }).__wonderGlobe = globe;
       const mounted = globe;
@@ -75,11 +81,13 @@ export function GlobeHost() {
 
     return () => {
       alive = false;
+      document.documentElement.classList.remove("globe-on");
       const w = window as unknown as { __wonderGlobe?: WonderGlobe };
       if (globe && w.__wonderGlobe === globe) delete w.__wonderGlobe;
       if (globe && release) release(globe);
       globeRef.current = null;
       setGlobe(null);
+      setReady(false);
     };
   }, [setGlobe, setLandmarks, setReady]);
 
@@ -92,21 +100,26 @@ export function GlobeHost() {
       globeRef.current?.setPresentation("map");
       return;
     }
-    if (mode === "hero" && slot) {
+    if (slot) {
       applyHeroFrame(frame, slot);
       globeRef.current?.setPresentation("hero");
+      return;
     }
+    applyMapFrame(frame);
   }, [mode, slot, morphing]);
 
   useLayoutEffect(() => {
     const frame = frameRef.current;
+    if (!frame || mode !== "opening") return;
     const from = openFromSlot.current;
-    if (!frame || mode !== "opening" || !from) return;
+    if (!from) {
+      void navigate({ to: "/map" });
+      return;
+    }
     const globe = globeRef.current;
 
     animRef.current?.cancel();
-    applyMapFrame(frame);
-    globe?.setResizePaused(false);
+    setMapLive(false);
     globe?.setPresentation("map", { interactive: false });
     globe?.setResizePaused(true);
     const anim = animateToMap(frame, from);
@@ -119,6 +132,8 @@ export function GlobeHost() {
         anim.cancel();
         globeRef.current?.setResizePaused(false);
         globeRef.current?.setPresentation("map");
+        setMapLive(true);
+        setMode("map");
         void navigate({ to: "/map" });
       },
       () => {},
@@ -128,23 +143,31 @@ export function GlobeHost() {
       anim.cancel();
       globeRef.current?.setResizePaused(false);
     };
-  }, [mode, navigate]);
+  }, [mode, navigate, setMode]);
 
   useLayoutEffect(() => {
     const frame = frameRef.current;
-    if (!frame || mode !== "closing" || !slot) return;
+    if (!frame || mode !== "closing") return;
+    const to = openFromSlot.current;
+    if (!to) {
+      setMapLive(false);
+      setMode("hero");
+      return;
+    }
     const globe = globeRef.current;
 
     animRef.current?.cancel();
+    setMapLive(false);
     globe?.setResizePaused(true);
+    globe?.freezeView();
     globe?.setPresentation("map", { interactive: false });
-    const anim = animateToHero(frame, slot);
+    const anim = animateToHero(frame, to);
     animRef.current = anim;
     let alive = true;
     void anim.finished.then(
       () => {
         if (!alive) return;
-        applyHeroFrame(frame, slot);
+        applyHeroFrame(frame, to);
         anim.cancel();
         globeRef.current?.setResizePaused(false);
         globeRef.current?.setPresentation("hero");
@@ -157,7 +180,7 @@ export function GlobeHost() {
       anim.cancel();
       globeRef.current?.setResizePaused(false);
     };
-  }, [mode, slot, setMode]);
+  }, [mode, setMode]);
 
   const show = painted && (live || !!slot || morphing);
 
@@ -171,7 +194,7 @@ export function GlobeHost() {
         mode === "hero" && "is-hero",
         show && "is-painted",
       )}
-      aria-hidden={mode === "hero" || mode === "opening"}
+      aria-hidden={mode === "hero" || (mode === "opening" && !mapLive)}
     >
       <div ref={stageRef} className="globe-host" />
     </div>

@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import type { Landmark } from "./landmarks";
 import { EARTH_URL, FLY_PLACE_DIST, type MarkerPick } from "./globe-types";
+import { createAtmosphereMesh, createEarthMaterial, studioLightDir } from "./globe-look";
 
 export type { MarkerKind, MarkerPick } from "./globe-types";
 export { FLY_LANDMARK_DIST, FLY_PLACE_DIST } from "./globe-types";
@@ -38,11 +39,13 @@ let earthTex: THREE.Texture | null = null;
 const earthTexWaiters: Array<(tex: THREE.Texture) => void> = [];
 
 function applyEarthTex(tex: THREE.Texture) {
-  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.colorSpace = THREE.NoColorSpace;
   tex.minFilter = THREE.LinearMipmapLinearFilter;
   tex.magFilter = THREE.LinearFilter;
-  tex.anisotropy = 4;
+  tex.anisotropy = 8;
   tex.generateMipmaps = true;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
 }
 
 function preloadEarthTexture() {
@@ -57,7 +60,7 @@ function preloadEarthTexture() {
     },
     undefined,
     () => {
-      for (const wait of earthTexWaiters) wait(makeSolidTex(30, 70, 140) as unknown as THREE.Texture);
+      for (const wait of earthTexWaiters) wait(makeSolidTex(14, 14, 16) as unknown as THREE.Texture);
       earthTexWaiters.length = 0;
     },
   );
@@ -83,6 +86,7 @@ const MAX_DIST = 4;
 const START_LAT = 16;
 const START_LNG = 18;
 const START_DIST = 2.5;
+const IDLE_SPIN = (Math.PI * 2) / 42;
 const _east = new THREE.Vector3();
 const _dir = new THREE.Vector3();
 const _tmp = new THREE.Vector3();
@@ -95,6 +99,8 @@ const _projClip = new THREE.Vector3();
 const _limb = new THREE.Vector3();
 const _limbC = new THREE.Vector3();
 const _limbE = new THREE.Vector3();
+const _light = new THREE.Vector3();
+const _camUp = new THREE.Vector3();
 
 function latLngToVec(lat: number, lng: number, radius = GLOBE_R, out = new THREE.Vector3()): THREE.Vector3 {
   const phi = (90 - lat) * (Math.PI / 180);
@@ -144,7 +150,7 @@ function scheduleIdle(cb: () => void, timeout = 800) {
 
 function makeSolidTex(r: number, g: number, b: number): THREE.DataTexture {
   const tex = new THREE.DataTexture(new Uint8Array([r, g, b, 255]), 1, 1);
-  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.colorSpace = THREE.NoColorSpace;
   tex.needsUpdate = true;
   return tex;
 }
@@ -154,28 +160,29 @@ let diamondTex: THREE.CanvasTexture | null = null;
 function getDiamondTexture(): THREE.CanvasTexture {
   if (diamondTex) return diamondTex;
   const c = document.createElement("canvas");
-  c.width = c.height = 128;
+  c.width = c.height = 256;
   const g = c.getContext("2d");
   if (!g) {
     diamondTex = new THREE.CanvasTexture(c);
     return diamondTex;
   }
+  g.lineJoin = "miter";
   const diamond = (inset: number) => {
     g.beginPath();
-    g.moveTo(64, inset);
-    g.lineTo(128 - inset, 64);
-    g.lineTo(64, 128 - inset);
-    g.lineTo(inset, 64);
+    g.moveTo(128, inset);
+    g.lineTo(256 - inset, 128);
+    g.lineTo(128, 256 - inset);
+    g.lineTo(inset, 128);
     g.closePath();
   };
-  g.strokeStyle = "rgba(255,255,255,0.95)";
-  g.lineWidth = 8;
-  diamond(8);
+  g.strokeStyle = "rgba(255,255,255,0.96)";
+  g.lineWidth = 14;
+  diamond(16);
   g.stroke();
-  g.fillStyle = "rgba(255,255,255,0.28)";
-  g.strokeStyle = "rgba(255,255,255,0.55)";
-  g.lineWidth = 5;
-  diamond(32);
+  g.fillStyle = "rgba(255,255,255,0.26)";
+  g.strokeStyle = "rgba(255,255,255,0.58)";
+  g.lineWidth = 8;
+  diamond(64);
   g.fill();
   g.stroke();
   diamondTex = new THREE.CanvasTexture(c);
@@ -228,7 +235,8 @@ export class WonderGlobe {
   private renderer: THREE.WebGLRenderer;
   private controls: OrbitControls;
   private earth: THREE.Mesh;
-  private earthMat: THREE.MeshBasicMaterial;
+  private earthMat: THREE.ShaderMaterial;
+  private atmosphere: THREE.Mesh;
   private pinPoints: THREE.Points | null = null;
   private pinPicks: MarkerPick[] = [];
   private pinColors: THREE.Float32BufferAttribute | null = null;
@@ -243,6 +251,7 @@ export class WonderGlobe {
   private statesLoading = false;
   private lastBorderDist = 0;
   private presentation: "hero" | "map" = "hero";
+  private interactive = false;
   private container: HTMLElement;
   private handlers: GlobeHandlers;
   private landmarks: Landmark[] = [];
@@ -264,6 +273,7 @@ export class WonderGlobe {
   private lastTick = 0;
   private holdIdle = false;
   private resizePaused = false;
+  private wantSpin = true;
 
   get ready() {
     return this.painted;
@@ -287,7 +297,7 @@ export class WonderGlobe {
 
     const bootDpr = window.devicePixelRatio || 1;
     this.renderer = new THREE.WebGLRenderer({
-      antialias: bootDpr < 1.5,
+      antialias: true,
       alpha: false,
       powerPreference: "high-performance",
     });
@@ -303,22 +313,12 @@ export class WonderGlobe {
     this.canvas.style.cursor = "grab";
     container.appendChild(this.canvas);
 
-    this.earthMat = new THREE.MeshBasicMaterial({
-      color: 0xffffff,
-      map: makeSolidTex(30, 70, 140),
-      side: THREE.DoubleSide,
-    });
-    this.earth = new THREE.Mesh(new THREE.SphereGeometry(GLOBE_R, 64, 32), this.earthMat);
+    this.earthMat = createEarthMaterial(makeSolidTex(14, 14, 16));
+    this.earth = new THREE.Mesh(new THREE.SphereGeometry(GLOBE_R, 128, 96), this.earthMat);
     this.earth.name = "globe";
     this.scene.add(this.earth);
-
-    whenEarthTexture((tex) => {
-      if (this.disposed) return;
-      const prev = this.earthMat.map;
-      this.earthMat.map = tex;
-      this.earthMat.needsUpdate = true;
-      if (prev && prev !== earthTex && prev !== tex) prev.dispose();
-    });
+    this.atmosphere = createAtmosphereMesh(GLOBE_R);
+    this.scene.add(this.atmosphere);
 
     this.pulseGeom.rotateX(-Math.PI / 2);
 
@@ -330,15 +330,18 @@ export class WonderGlobe {
     this.controls.maxDistance = MAX_DIST;
     this.controls.rotateSpeed = 0.85;
     this.controls.zoomSpeed = 1.15;
-    this.controls.autoRotate = !this.reducedMotion;
-    this.controls.autoRotateSpeed = 0.2;
+    this.controls.autoRotate = false;
+    this.controls.autoRotateSpeed = 0;
+    this.wantSpin = !this.reducedMotion;
     this.controls.target.set(0, 0, 0);
     this.controls.update();
+    this.syncLight();
+    this.syncAtmosphere();
 
     this.lastInput = performance.now();
     this.controls.addEventListener("start", () => {
       this.lastInput = performance.now();
-      this.controls.autoRotate = false;
+      this.wantSpin = false;
     });
     this.controls.addEventListener("end", () => {
       this.lastInput = performance.now();
@@ -355,8 +358,18 @@ export class WonderGlobe {
     this.ro.observe(container);
     this.lastTick = performance.now();
     this.renderer.render(this.scene, this.camera);
-    this.notifyReady();
     this.loop();
+    whenEarthTexture((tex) => {
+      if (this.disposed) return;
+      tex.anisotropy = Math.min(8, this.renderer.capabilities.getMaxAnisotropy());
+      const prev = this.earthMat.uniforms.map.value as THREE.Texture | null;
+      this.earthMat.uniforms.map.value = tex;
+      this.earthMat.uniformsNeedUpdate = true;
+      if (prev && prev !== earthTex && prev !== tex) prev.dispose();
+      this.syncLight();
+      this.renderer.render(this.scene, this.camera);
+      this.notifyReady();
+    });
     scheduleIdle(() => {
       if (!this.disposed) void this.loadBorders("c");
     }, 800);
@@ -371,6 +384,7 @@ export class WonderGlobe {
   private ro = new ResizeObserver(() => this.sizeRenderer());
 
   setResizePaused(paused: boolean) {
+    if (this.resizePaused === paused) return;
     this.resizePaused = paused;
     if (!paused) this.sizeRenderer();
   }
@@ -381,7 +395,7 @@ export class WonderGlobe {
     const h = Math.max(1, this.container.clientHeight);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
-    const dpr = Math.min(window.devicePixelRatio || 1, this.presentation === "hero" ? 1 : 2);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
     this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(w, h, false);
     this.syncPinSize();
@@ -448,10 +462,10 @@ export class WonderGlobe {
     if (Math.abs(dist - this.lastBorderDist) < 0.012) return;
     this.lastBorderDist = dist;
     const zoom = THREE.MathUtils.clamp(THREE.MathUtils.inverseLerp(2.35, 1.38, dist), 0, 1);
-    if (this.countryMat) this.countryMat.opacity = THREE.MathUtils.lerp(0.16, 0.3, zoom);
+    if (this.countryMat) this.countryMat.opacity = THREE.MathUtils.lerp(0.14, 0.28, zoom);
     if (this.presentation === "map" && zoom > 0.12) void this.loadBorders("s");
     if (this.stateMat) {
-      this.stateMat.opacity = zoom < 0.12 ? 0 : THREE.MathUtils.lerp(0, 0.16, zoom);
+      this.stateMat.opacity = zoom < 0.12 ? 0 : THREE.MathUtils.lerp(0, 0.14, zoom);
       this.stateMat.visible = this.stateMat.opacity > 0.01;
     }
   }
@@ -517,7 +531,7 @@ export class WonderGlobe {
       this.flyAnim = null;
     }
 
-    this.controls.autoRotate = false;
+    this.wantSpin = false;
     this.controls.enabled = false;
     this.controls.target.set(0, 0, 0);
     this.clearControlInertia();
@@ -564,7 +578,7 @@ export class WonderGlobe {
     const sprite = new THREE.Sprite(mat);
     latLngToVec(lat, lng, GLOBE_R * 1.014, _tmp);
     sprite.position.copy(_tmp);
-    sprite.scale.setScalar(0.09);
+    sprite.scale.setScalar(0.058);
     this.scene.add(sprite);
     this.geoMarker = sprite;
     this.geoPick = { kind: "geocode", lat, lng, label };
@@ -577,17 +591,62 @@ export class WonderGlobe {
   setSpin(on: boolean) {
     if (this.reducedMotion) return;
     if (this.holdIdle && on) return;
-    this.controls.autoRotate = on;
+    this.wantSpin = on;
     this.lastInput = performance.now();
   }
 
   holdIdleSpin(held: boolean) {
     this.holdIdle = held;
-    if (held) this.controls.autoRotate = false;
+    if (held) this.wantSpin = false;
   }
 
   get spinning() {
-    return this.controls.autoRotate;
+    return this.wantSpin;
+  }
+
+  freezeView() {
+    if (this.flyAnim) {
+      this.flyAnim.resolve();
+      this.flyAnim = null;
+    }
+    this.flying = false;
+    this.wantSpin = false;
+    this.holdIdle = true;
+    this.syncControlsToCamera();
+  }
+
+  pullBack(duration = 900): Promise<void> {
+    const from = this.camera.position.clone();
+    const startLen = Math.max(from.length(), MIN_DIST);
+    this.holdIdle = false;
+    if (startLen >= START_DIST - 0.05) {
+      this.wantSpin = !this.reducedMotion;
+      return Promise.resolve();
+    }
+    if (this.flyAnim) {
+      this.flyAnim.resolve();
+      this.flyAnim = null;
+    }
+    this.wantSpin = false;
+    this.controls.enabled = false;
+    this.controls.target.set(0, 0, 0);
+    this.clearControlInertia();
+    const end = from.clone().normalize().multiplyScalar(START_DIST);
+    const dur = this.reducedMotion ? 0 : duration / 1000;
+    this.flying = true;
+    this.lastInput = performance.now();
+    return new Promise((resolve) => {
+      this.flyAnim = {
+        start: from,
+        end,
+        startLen,
+        endLen: START_DIST,
+        bump: 0,
+        elapsed: 0,
+        duration: dur,
+        resolve,
+      };
+    });
   }
 
   setPresentation(mode: "hero" | "map", opts?: { interactive?: boolean }) {
@@ -595,6 +654,7 @@ export class WonderGlobe {
     const interactive = opts?.interactive ?? !hero;
     const changed = this.presentation !== mode;
     this.presentation = mode;
+    this.interactive = interactive;
     this.controls.enabled = interactive;
     this.controls.enableRotate = interactive;
     this.controls.enableZoom = interactive;
@@ -602,7 +662,8 @@ export class WonderGlobe {
     this.canvas.style.cursor = interactive ? "grab" : "default";
     if (hero) {
       this.holdIdle = false;
-      if (!this.reducedMotion) this.controls.autoRotate = true;
+      if (changed) void this.pullBack();
+      else if (!this.flying) this.wantSpin = !this.reducedMotion;
     }
     if (this.landmarks.length && !this.pinPoints) this.rebuildMarkers();
     if (changed) this.sizeRenderer();
@@ -656,8 +717,12 @@ export class WonderGlobe {
     }
     this.ripples.length = 0;
     this.earth.geometry.dispose();
-    if (this.earthMat.map && this.earthMat.map !== earthTex) this.earthMat.map.dispose();
+    const earthMap = this.earthMat.uniforms.map.value as THREE.Texture | null;
+    if (earthMap && earthMap !== earthTex) earthMap.dispose();
     this.earthMat.dispose();
+    this.scene.remove(this.atmosphere);
+    this.atmosphere.geometry.dispose();
+    (this.atmosphere.material as THREE.Material).dispose();
     this.pulseGeom.dispose();
     this.scene.traverse((obj) => {
       if (obj instanceof THREE.LineSegments) obj.geometry.dispose();
@@ -702,8 +767,12 @@ export class WonderGlobe {
     this.syncControlsToCamera();
     this.flying = false;
     this.flyAnim = null;
-    this.controls.enabled = true;
-    this.controls.autoRotate = false;
+    this.controls.enabled = this.interactive;
+    this.controls.enableRotate = this.interactive;
+    this.controls.enableZoom = this.interactive;
+    this.canvas.style.pointerEvents = this.interactive ? "auto" : "none";
+    this.canvas.style.cursor = this.interactive ? "grab" : "default";
+    this.wantSpin = this.presentation === "hero" && !this.reducedMotion;
     this.lastInput = performance.now();
     f.resolve();
   }
@@ -751,9 +820,9 @@ export class WonderGlobe {
       pos[i * 3] = _tmp.x;
       pos[i * 3 + 1] = _tmp.y;
       pos[i * 3 + 2] = _tmp.z;
-      col[i * 3] = 0.92;
-      col[i * 3 + 1] = 0.94;
-      col[i * 3 + 2] = 0.97;
+      col[i * 3] = 1;
+      col[i * 3 + 1] = 1;
+      col[i * 3 + 2] = 1;
       const data: MarkerPick = { kind: "pin", lat: lm.lat, lng: lm.lng, landmark: lm };
       this.pinPicks.push(data);
       if (this.focusLandmark && this.isFocus(lm)) this.selected = data;
@@ -785,10 +854,10 @@ export class WonderGlobe {
     const arr = this.pinColors.array as Float32Array;
     for (let i = 0; i < this.pinPicks.length; i++) {
       const on = this.selected === this.pinPicks[i] || this.hovered === this.pinPicks[i];
-      const v = on ? 1 : 0.82;
+      const v = on ? 1 : 0.88;
       arr[i * 3] = v;
       arr[i * 3 + 1] = v;
-      arr[i * 3 + 2] = on ? 1 : 0.9;
+      arr[i * 3 + 2] = v;
     }
     this.pinColors.needsUpdate = true;
   }
@@ -816,7 +885,7 @@ export class WonderGlobe {
   private spawnRipple(point: THREE.Vector3) {
     if (this.reducedMotion) return;
     const mat = new THREE.MeshBasicMaterial({
-      color: 0xc5d4e4,
+      color: 0xffffff,
       transparent: true,
       opacity: 0.5,
       side: THREE.DoubleSide,
@@ -841,7 +910,7 @@ export class WonderGlobe {
     this.downX = e.clientX;
     this.downY = e.clientY;
     this.lastInput = performance.now();
-    this.controls.autoRotate = false;
+    this.wantSpin = false;
     this.canvas.style.cursor = "grabbing";
   };
 
@@ -898,11 +967,19 @@ export class WonderGlobe {
     const now = performance.now();
     const dt = Math.min((now - this.lastTick) / 1000, 0.1);
     this.lastTick = now;
-    if (this.flyAnim) this.stepFly(dt);
-    else this.controls.update();
+    if (this.flyAnim) {
+      this.stepFly(dt);
+    } else {
+      const dragging = this.orbit().state !== -1;
+      if (this.wantSpin && !this.reducedMotion && !this.holdIdle && !dragging) {
+        this.camera.position.applyAxisAngle(UP, dt * IDLE_SPIN);
+        this.camera.lookAt(0, 0, 0);
+      }
+      this.controls.update(dt);
+    }
 
-    if (!this.reducedMotion && !this.flyAnim && !this.controls.autoRotate && !this.holdIdle) {
-      if (performance.now() - this.lastInput > 8000) this.controls.autoRotate = true;
+    if (!this.reducedMotion && !this.flyAnim && !this.wantSpin && !this.holdIdle) {
+      if (now - this.lastInput > 8000) this.wantSpin = true;
     }
 
     for (let i = this.ripples.length - 1; i >= 0; i--) {
@@ -920,8 +997,24 @@ export class WonderGlobe {
     }
 
     this.fadeBorders();
+    this.syncLight();
+    this.syncAtmosphere();
     this.renderer.render(this.scene, this.camera);
   };
+
+  private syncLight() {
+    this.camera.updateMatrixWorld();
+    studioLightDir(this.camera, _light, _east, _camUp);
+    this.earthMat.uniforms.lightDir.value.copy(_light);
+  }
+
+  private syncAtmosphere() {
+    const dist = this.camera.position.length();
+    const k = THREE.MathUtils.smoothstep(dist, 1.38, 1.9);
+    const mat = this.atmosphere.material as THREE.ShaderMaterial;
+    mat.uniforms.intensity.value = k;
+    this.atmosphere.visible = k > 0.02;
+  }
 }
 
 let sharedGlobe: WonderGlobe | null = null;

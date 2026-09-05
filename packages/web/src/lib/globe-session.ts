@@ -40,11 +40,10 @@ export const useGlobeSession = create<GlobeSession>((set) => ({
 
 export function useOpenMap() {
   const navigate = useNavigate();
-  const setMode = useGlobeSession((s) => s.setMode);
-  const mode = useGlobeSession((s) => s.mode);
 
   return () => {
-    if (mode === "opening" || mode === "map") return;
+    const { mode, ready, setMode } = useGlobeSession.getState();
+    if (!ready || mode === "opening" || mode === "map") return;
     if (prefersReducedMotion()) {
       setMode("map");
       void navigate({ to: "/map" });
