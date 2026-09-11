@@ -165,7 +165,7 @@ async function handleReadingEvent(eventType: number, state: AppState, bridge: an
       if (!state.detailLoaded) {
         state.detailLoaded = true;
         await renderReadingPage(landmark, pages[page], page, pages.length, true, true);
-        fetchLandmarkDetail(landmark.name, getUnits()).then(async detail => {
+        fetchLandmarkDetail(landmark, getUnits()).then(async detail => {
           if (state.mode !== 'reading' || state.landmarks[state.selectedIndex] !== landmark) return;
           const combined = landmark.snippet + (detail ? '\n\n' + detail + '\n' : '');
           state.readingPages = paginateText(combined);

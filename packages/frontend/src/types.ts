@@ -5,6 +5,12 @@ export interface Landmark {
   snippet: string;
   lat?: number;
   lng?: number;
+  wikipedia?: string;
+  wikidata?: string;
+  description?: string;
+  startDate?: string;
+  architect?: string;
+  city?: string;
 }
 
 export interface HistoryEntry {

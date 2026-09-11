@@ -39,11 +39,25 @@ export async function fetchLandmarks(lat: number, lng: number): Promise<Landmark
     .sort((a, b) => a.distance - b.distance);
 }
 
-export async function fetchLandmarkDetail(name: string, units: 'imperial' | 'metric' = 'imperial'): Promise<string> {
+export async function fetchLandmarkDetail(landmark: Landmark, units: 'imperial' | 'metric' = 'imperial'): Promise<string> {
   const response = await fetch(`${API_BASE_URL}/api/landmark-detail`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, units }),
+    body: JSON.stringify({
+      name: landmark.name,
+      type: landmark.type,
+      lat: landmark.lat,
+      lng: landmark.lng,
+      distance: landmark.distance,
+      snippet: landmark.snippet,
+      wikipedia: landmark.wikipedia,
+      wikidata: landmark.wikidata,
+      description: landmark.description,
+      startDate: landmark.startDate,
+      architect: landmark.architect,
+      city: landmark.city,
+      units,
+    }),
   });
 
   if (!response.ok) {

@@ -170,7 +170,7 @@ export async function stopVoiceRecording(state: AppState): Promise<void> {
       state.readingPages = paginateText(landmark.snippet);
       state.readingPage = 0;
       await renderReadingPage(landmark, state.readingPages[0], 0, state.readingPages.length, true, true);
-      fetchLandmarkDetail(landmark.name, getUnits()).then(async detail => {
+      fetchLandmarkDetail(landmark, getUnits()).then(async detail => {
         if (state.mode !== 'reading' || state.landmarks[state.selectedIndex] !== landmark) return;
         const combined = landmark.snippet + (detail ? '\n\n' + detail + '\n' : '');
         state.readingPages = paginateText(combined);
