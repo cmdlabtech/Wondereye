@@ -2,7 +2,7 @@
 
 ## Worker — 2026-09-11 (nearby list empty)
 
-- Nearby landmark scans returned `[]` even in dense cities: Grok echoed `Name (type)` from the candidate line, then exact OSM-name matching dropped every row. Candidates now label `name=` vs `type=` separately; matching also accepts a trailing parenthetical.
+- Nearby landmark scans returned `[]` even in dense cities. Two stacked bugs: Grok echoed `Name (type)` and exact OSM-name matching dropped every row; Overpass fallback treated `overpass.osm.ch` 200-with-zero-elements as "nothing nearby" after the global mirrors failed. Candidates now label `name=` vs `type=` separately; empty Overpass bodies skip to the next endpoint.
 
 ## v1.6.2 — 2026-07-07
 
