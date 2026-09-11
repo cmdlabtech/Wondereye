@@ -78,11 +78,39 @@ export async function queryOverpass(
     const type = specificBuilding || element.tags.amenity || element.tags.historic || element.tags.tourism || 'landmark';
 
     const distance = haversineDistance(lat, lng, elLat, elLng);
+    const tags = element.tags as Record<string, string> | undefined;
 
-    pois.push({ name, type, lat: elLat, lng: elLng, distance: Math.round(distance) });
+    pois.push({
+      name,
+      type,
+      lat: elLat,
+      lng: elLng,
+      distance: Math.round(distance),
+      ...(optionalTag(tags, 'wikipedia', 150, 'wikipedia')),
+      ...(optionalTag(tags, 'wikidata', 40, 'wikidata')),
+      ...(optionalTag(tags, 'description:en', 240, 'description')
+        ?? optionalTag(tags, 'description', 240, 'description')),
+      ...(optionalTag(tags, 'start_date', 40, 'startDate')),
+      ...(optionalTag(tags, 'architect', 80, 'architect')
+        ?? optionalTag(tags, 'artist_name', 80, 'architect')),
+      ...(optionalTag(tags, 'addr:city', 80, 'city')
+        ?? optionalTag(tags, 'addr:suburb', 80, 'city')
+        ?? optionalTag(tags, 'is_in:city', 80, 'city')),
+    });
   }
 
   return pois.sort((a, b) => a.distance - b.distance).slice(0, 20);
+}
+
+function optionalTag(
+  tags: Record<string, string> | undefined,
+  osmKey: string,
+  max: number,
+  field: string,
+): Record<string, string> | undefined {
+  const value = tags?.[osmKey]?.trim();
+  if (!value) return undefined;
+  return { [field]: value.slice(0, max) };
 }
 
 function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {

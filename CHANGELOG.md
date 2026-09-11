@@ -1,5 +1,9 @@
 # Changelog
 
+## Worker — 2026-09-11 (nearby list empty)
+
+- Nearby landmark scans returned `[]` even in dense cities: Grok echoed `Name (type)` from the candidate line, then exact OSM-name matching dropped every row. Candidates now label `name=` vs `type=` separately; matching also accepts a trailing parenthetical.
+
 ## v1.6.2 — 2026-07-07
 
 - Adjustable search range slider (250 m–2000 m) to control how far Wondereye looks for landmarks
