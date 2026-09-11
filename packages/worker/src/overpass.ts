@@ -25,50 +25,40 @@ export async function queryOverpass(
   ];
 
   const ENDPOINT_TIMEOUT_MS = 20_000;
+  const body = `data=${encodeURIComponent(query)}`;
+  const headers = {
+    'Content-Type': 'application/x-www-form-urlencoded',
+    // Overpass instances require an identifying UA per OSM usage policy
+    // (overpass-api.de returns 406 without one)
+    'User-Agent': 'Wondereye/1.6.2 (https://wondereye.app)',
+  };
 
-  let data: { elements?: unknown[] } | undefined;
-  for (const endpoint of endpoints) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), ENDPOINT_TIMEOUT_MS);
-    try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        body: `data=${encodeURIComponent(query)}`,
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          // Overpass instances require an identifying UA per OSM usage policy
-          // (overpass-api.de returns 406 without one)
-          'User-Agent': 'Wondereye/1.6.2 (https://wondereye.app)',
-        },
-        signal: controller.signal,
-      });
-      if (!response.ok) {
-        console.warn(`[overpass] ${endpoint} returned ${response.status}, trying next...`);
-        continue;
-      }
-      const parsed: any = await response.json();
-      if (!parsed || !Array.isArray(parsed.elements)) {
-        console.warn(`[overpass] ${endpoint} unexpected body, trying next...`);
-        continue;
-      }
-      // A 200 with zero elements is a miss (e.g. regional mirrors), not "no POIs".
-      if (parsed.elements.length === 0) {
-        console.warn(`[overpass] ${endpoint} returned 0 elements, trying next...`);
-        continue;
-      }
-      data = parsed;
-      break;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.warn(`[overpass] ${endpoint} failed: ${msg}`);
-    } finally {
-      clearTimeout(timer);
+  const elements = await new Promise<any[]>((resolve, reject) => {
+    let rejected = 0;
+    const total = endpoints.length;
+    for (const endpoint of endpoints) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), ENDPOINT_TIMEOUT_MS);
+      fetch(endpoint, { method: 'POST', body, headers, signal: controller.signal })
+        .then(async (response) => {
+          if (!response.ok) throw new Error(`status ${response.status}`);
+          const parsed: any = await response.json();
+          if (!parsed || !Array.isArray(parsed.elements)) throw new Error('unexpected body');
+          // 200 with zero elements is a miss (regional mirrors), not "no POIs".
+          if (parsed.elements.length === 0) throw new Error('0 elements');
+          resolve(parsed.elements);
+        })
+        .catch((err) => {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn(`[overpass] ${endpoint} failed: ${msg}`);
+          rejected++;
+          if (rejected === total) reject(new Error('Overpass API error: no response'));
+        })
+        .finally(() => clearTimeout(timer));
     }
-  }
+  });
 
-  if (!data || !Array.isArray(data.elements)) {
-    throw new Error('Overpass API error: no response');
-  }
+  const data = { elements };
 
   const seen = new Set<string>();
   const pois: RawPOI[] = [];
