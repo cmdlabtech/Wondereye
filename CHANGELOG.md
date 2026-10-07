@@ -11,7 +11,7 @@
 - Only English descriptions are added to the community map at this time.
 
 ### Phone settings
-- The settings page has a more compact layout and now fits on a single phone screen. Connection and location status appear on one line, settings are grouped in one card with a language menu, an inline range slider, a units selector, and a device location switch, and My Map Contributions and Send Feedback are collapsed rows at the bottom.
+- The settings page has a more compact layout and now fits on a single phone screen. Glasses connection and location status are shown as icons with a colored status indicator in the title bar, and the full status is available as a tooltip. Settings are grouped in one card with a language menu, an inline range slider, a units selector, and a device location switch, and My Map Contributions and Send Feedback are collapsed rows at the bottom.
 
 ### Feedback
 - A Send Feedback form is now available in the phone settings page and on the wondereye.app map. You may report a bug, suggest an idea, or share other comments without providing an email address or creating an account.

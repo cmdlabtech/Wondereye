@@ -38,23 +38,38 @@ let connectionText: () => string = () => t('p.connecting');
 let locationText: () => string = () => t('p.waiting');
 let lastEntries: HistoryEntry[] | null = null;
 
-function setPhoneStatus(text: () => string) {
-  connectionText = text;
-  const el = document.getElementById('connection-status');
-  if (el) el.textContent = text();
-}
+type DotState = 'active' | 'loading' | 'error';
 
-function setPhoneDot(id: string, state: 'active' | 'loading' | 'off') {
+// The status icons have no visible text: the state lives in the dot colour and
+// in a localized tooltip / aria-label ("Location: Prague").
+function setStatusLabel(id: string, labelKey: 'p.glasses' | 'p.location', value: string) {
   const el = document.getElementById(id);
   if (!el) return;
-  el.className = 'dot' + (state !== 'off' ? ' ' + state : '');
+  const label = t('p.statusFmt', { label: t(labelKey), value });
+  el.setAttribute('aria-label', label);
+  el.title = label;
 }
 
-function setPhoneLocationStatus(text: () => string, active = false) {
+function paintStatusLabels() {
+  setStatusLabel('glasses-status', 'p.glasses', connectionText());
+  setStatusLabel('location-status-icon', 'p.location', locationText());
+}
+
+function setPhoneStatus(text: () => string) {
+  connectionText = text;
+  paintStatusLabels();
+}
+
+function setPhoneDot(id: string, state: DotState) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.className = 'dot ' + state;
+}
+
+function setPhoneLocationStatus(text: () => string, state: DotState) {
   locationText = text;
-  const el = document.getElementById('location-status');
-  if (el) el.textContent = text();
-  setPhoneDot('location-dot', active ? 'active' : 'off');
+  paintStatusLabels();
+  setPhoneDot('location-dot', state);
 }
 
 function renderContributions(entries: HistoryEntry[]): void {
@@ -136,7 +151,7 @@ async function loadLandmarks(): Promise<void> {
       await renderLoading();
     }
 
-    setPhoneLocationStatus(() => t('p.gettingLocation'));
+    setPhoneLocationStatus(() => t('p.gettingLocation'), 'loading');
     const { lat, lng } = await getLocation();
 
     // Location is resolved at this point. Say so right away: previously the
@@ -144,7 +159,7 @@ async function loadLandmarks(): Promise<void> {
     // and, if that fetch failed, forever — which made an API outage look
     // like a stuck GPS fix.
     const coords = `${lat.toFixed(3)}, ${lng.toFixed(3)}`;
-    setPhoneLocationStatus(() => t('p.finding', { coords }), true);
+    setPhoneLocationStatus(() => t('p.finding', { coords }), 'active');
 
     // Store coordinates for compass bearing calculations; reset compass calibration
     state.userLat = lat;
@@ -156,7 +171,7 @@ async function loadLandmarks(): Promise<void> {
       reverseGeocode(lat, lng),
     ]);
 
-    setPhoneLocationStatus(() => city || coords, true);
+    setPhoneLocationStatus(() => city || coords, 'active');
 
     if (landmarks.length === 0) {
       state.mode = 'error';
@@ -180,9 +195,9 @@ async function loadLandmarks(): Promise<void> {
     // Never leave the phone stuck on "Getting location..." / "finding landmarks...".
     if (state.userLat != null && state.userLng != null) {
       const coords = `${state.userLat.toFixed(3)}, ${state.userLng.toFixed(3)}`;
-      setPhoneLocationStatus(() => t('p.lookupFailed', { coords }), true);
+      setPhoneLocationStatus(() => t('p.lookupFailed', { coords }), 'active');
     } else {
-      setPhoneLocationStatus(() => t('p.locUnavailable'));
+      setPhoneLocationStatus(() => t('p.locUnavailable'), 'error');
     }
 
     const locErr = error as LocationError;
@@ -329,10 +344,7 @@ function initLanguagePicker(): void {
 /** Re-translate everything on the phone page after a language change. */
 function refreshPhoneText(): void {
   applyI18n(document);
-  const conn = document.getElementById('connection-status');
-  if (conn) conn.textContent = connectionText();
-  const loc = document.getElementById('location-status');
-  if (loc) loc.textContent = locationText();
+  paintStatusLabels();
   if (lastEntries) renderContributions(lastEntries);
   refreshRadiusLabel();
 }
@@ -361,7 +373,7 @@ async function main(): Promise<void> {
     applyI18n(document);
     onLangChange(refreshPhoneText);
     setPhoneStatus(() => t('p.connecting'));
-    setPhoneLocationStatus(() => t('p.waiting'));
+    setPhoneLocationStatus(() => t('p.waiting'), 'loading');
     setPhoneDot('connection-dot', 'loading');
     await initBridge();
 
@@ -413,7 +425,7 @@ async function main(): Promise<void> {
     const msg = error instanceof Error ? error.message : t('e.unknown');
     console.error('[app] main error:', msg, error);
     setPhoneStatus(() => t('p.errorPrefix', { msg }));
-    setPhoneDot('connection-dot', 'off');
+    setPhoneDot('connection-dot', 'error');
   }
 }
 
