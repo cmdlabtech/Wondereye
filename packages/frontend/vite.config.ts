@@ -8,8 +8,8 @@ const env = loadEnv('development', process.cwd());
 const devHost = process.env.VITE_DEV_IP || env.VITE_DEV_IP || 'localhost';
 
 // Strip files that must never ship: internal docs (public/CLAUDE.md) always;
-// in EHPK builds also _headers (a Cloudflare Pages file — useless in the .ehpk
-// and its URLs trip the store's network-whitelist scanner).
+// in EHPK builds also _headers and _redirects (Cloudflare files — useless in
+// the .ehpk, and _headers' URLs trip the store's network-whitelist scanner).
 function stripInternalFiles(isEhpk: boolean): Plugin {
   let config: ResolvedConfig;
   return {
@@ -20,7 +20,10 @@ function stripInternalFiles(isEhpk: boolean): Plugin {
     closeBundle() {
       const outDir = resolve(config.root, config.build.outDir);
       rmSync(resolve(outDir, 'CLAUDE.md'), { force: true });
-      if (isEhpk) rmSync(resolve(outDir, '_headers'), { force: true });
+      if (isEhpk) {
+        rmSync(resolve(outDir, '_headers'), { force: true });
+        rmSync(resolve(outDir, '_redirects'), { force: true });
+      }
     },
   };
 }

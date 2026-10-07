@@ -1,5 +1,26 @@
 # Changelog
 
+## v1.6.5 - 2026-09-26
+
+### Landmark reliability
+- Nearby landmarks now load reliably when public map data servers are busy or unavailable. Wondereye queries Wikipedia and OpenStreetMap together and combines the results, so a slow or unavailable source no longer prevents landmarks from appearing.
+- Landmark searches complete within about 8 seconds in the worst case, and the app stops waiting after 30 seconds.
+- When a lookup cannot be completed, the glasses show a clear message with guidance, for example "Landmark service is busy. Tap to retry in a moment.", instead of a technical error code.
+- The phone screen shows your coordinates as soon as your location is found and indicates when a landmark lookup has failed, rather than remaining on "Getting location...".
+- Landmark descriptions are based on Wikipedia article summaries and OpenStreetMap details where available, which reduces inaccurate dates, figures, and names. Descriptions are presented as two concise sentences.
+
+### Glasses experience
+- Opening and closing the system menu no longer pauses the compass or cancels a voice search in progress.
+- Tapping to retry after an error now shows the loading screen immediately while the new lookup runs.
+
+### Platform
+- Updated to Even Hub SDK 0.0.14 and Even Hub CLI 0.1.14.
+- Wondereye 1.6.5 requires Even Realities App 2.2.9 or later.
+
+## Worker — 2026-09-11 (nearby list empty)
+
+- Nearby landmark scans returned `[]` even in dense cities. Two stacked bugs: Grok echoed `Name (type)` and exact OSM-name matching dropped every row; Overpass fallback treated `overpass.osm.ch` 200-with-zero-elements as "nothing nearby" after the global mirrors failed. Candidates now label `name=` vs `type=` separately; empty Overpass bodies skip to the next endpoint.
+
 ## v1.6.2 — 2026-07-07
 
 - Adjustable search range slider (250 m–2000 m) to control how far Wondereye looks for landmarks

@@ -12,6 +12,31 @@ import { setIMUReporting } from './imu';
 // Refresh. selectedIndex === landmarks.length → Voice, landmarks.length + 1 → Refresh.
 export const LIST_ACTION_ROWS = 2;
 
+// Foreground tracking. Besides real app switches, the glasses OS reports its
+// contextual menu overlay (tap then long press, Even App 2.2.9+) through the
+// same events: opening it sends FOREGROUND_ENTER, dismissing it sends
+// FOREGROUND_EXIT while the app stays on screen. An ENTER that arrives while
+// already in the foreground is therefore the overlay opening, and the EXIT
+// that follows only closes it; neither must pause IMU or cancel voice input.
+let inForeground = true;
+let overlayOpen = false;
+
+// Taps and scrolls can arrive as text, list, or system events; a click's
+// eventType (0) is often normalized away, so a bare system event counts too.
+const USER_INPUT_TYPES: ReadonlySet<number> = new Set([
+  OsEventTypeList.CLICK_EVENT,
+  OsEventTypeList.SCROLL_TOP_EVENT,
+  OsEventTypeList.SCROLL_BOTTOM_EVENT,
+  OsEventTypeList.DOUBLE_CLICK_EVENT,
+]);
+
+function isUserInput(event: any): boolean {
+  if (event.textEvent || event.listEvent) return true;
+  if (!event.sysEvent) return false;
+  const type = event.sysEvent.eventType;
+  return type == null || USER_INPUT_TYPES.has(type);
+}
+
 export function setupEventHandlers(
   state: AppState,
   onRefresh: () => void,
@@ -22,6 +47,16 @@ export function setupEventHandlers(
   const bridge = getBridge();
 
   bridge.onEvenHubEvent(async (event: any) => {
+
+    // Input only reaches the app when no OS overlay has focus, so any tap,
+    // scroll, or double-tap means the overlay is gone and the app is in front.
+    if (isUserInput(event)) {
+      overlayOpen = false;
+      if (!inForeground) {
+        inForeground = true;
+        if (onIMUEvent) setIMUReporting(bridge, true);
+      }
+    }
 
     // Audio chunks are delivered via audioEvent — route them directly to the voice
     // handler before any other processing so they always reach the recording buffer.
@@ -37,6 +72,12 @@ export function setupEventHandlers(
     if (event.sysEvent && !event.textEvent && !event.listEvent) {
       const sysEventType = event.sysEvent?.eventType;
       if (sysEventType === OsEventTypeList.FOREGROUND_EXIT_EVENT) {
+        if (overlayOpen) {
+          overlayOpen = false;
+          console.log('[events] system menu closed — app stays in foreground');
+          return;
+        }
+        inForeground = false;
         console.log('[events] backgrounded — pausing IMU/audio');
         if (state.mode === 'listening') cancelVoiceRecording(state, false);
         if (onIMUEvent) setIMUReporting(bridge, false);
@@ -46,12 +87,20 @@ export function setupEventHandlers(
       // shutDownPageContainer(1) — this is where hardware cleanup belongs.
       if (sysEventType === OsEventTypeList.ABNORMAL_EXIT_EVENT ||
           sysEventType === OsEventTypeList.SYSTEM_EXIT_EVENT) {
+        inForeground = false;
+        overlayOpen = false;
         console.log('[events] exiting — releasing IMU/audio:', sysEventType);
         if (state.mode === 'listening') cancelVoiceRecording(state, false);
         if (onIMUEvent) setIMUReporting(bridge, false);
         return;
       }
       if (sysEventType === OsEventTypeList.FOREGROUND_ENTER_EVENT) {
+        if (inForeground) {
+          overlayOpen = true;
+          console.log('[events] system menu opened over the app');
+          return;
+        }
+        inForeground = true;
         console.log('[events] foregrounded — resuming IMU');
         if (onIMUEvent) setIMUReporting(bridge, true);
         // Guarded re-render: only once landmarks are loaded — rendering during
@@ -165,7 +214,7 @@ async function handleReadingEvent(eventType: number, state: AppState, bridge: an
       if (!state.detailLoaded) {
         state.detailLoaded = true;
         await renderReadingPage(landmark, pages[page], page, pages.length, true, true);
-        fetchLandmarkDetail(landmark.name, getUnits()).then(async detail => {
+        fetchLandmarkDetail(landmark, getUnits()).then(async detail => {
           if (state.mode !== 'reading' || state.landmarks[state.selectedIndex] !== landmark) return;
           const combined = landmark.snippet + (detail ? '\n\n' + detail + '\n' : '');
           state.readingPages = paginateText(combined);

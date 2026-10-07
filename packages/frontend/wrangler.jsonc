@@ -5,6 +5,7 @@
     { "pattern": "wondereye.app", "custom_domain": true }
   ],
   "assets": {
-    "directory": "./dist"
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
   }
 }

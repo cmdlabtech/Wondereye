@@ -19,6 +19,11 @@ const state: AppState = {
   mode: 'loading',
 };
 
+// The first load runs under the startup page (already a loading screen);
+// every later load (refresh, retry from the error view, settings change)
+// redraws the loading screen so the tap has a visible response.
+let firstLoad = true;
+
 // Fallback coordinates (Prague, Czech Republic) for simulator/testing
 const FALLBACK_LAT = 50.090167;
 const FALLBACK_LNG = 14.401917;
@@ -115,13 +120,21 @@ async function getLocation(): Promise<{ lat: number; lng: number }> {
 async function loadLandmarks(): Promise<void> {
   try {
     state.mode = 'loading';
-    // Only rebuild if this is a refresh (not initial load — startup page already showing)
-    if (state.landmarks.length > 0) {
+    if (firstLoad) {
+      firstLoad = false;
+    } else {
       await renderLoading();
     }
 
     setPhoneLocationStatus('Getting location...');
     const { lat, lng } = await getLocation();
+
+    // Location is resolved at this point. Say so right away: previously the
+    // phone kept showing "Getting location..." for the whole landmark fetch
+    // and, if that fetch failed, forever — which made an API outage look
+    // like a stuck GPS fix.
+    const coords = `${lat.toFixed(3)}, ${lng.toFixed(3)}`;
+    setPhoneLocationStatus(`${coords} · finding landmarks...`, true);
 
     // Store coordinates for compass bearing calculations; reset compass calibration
     state.userLat = lat;
@@ -133,7 +146,7 @@ async function loadLandmarks(): Promise<void> {
       reverseGeocode(lat, lng),
     ]);
 
-    setPhoneLocationStatus(city || `${lat.toFixed(3)}, ${lng.toFixed(3)}`, true);
+    setPhoneLocationStatus(city || coords, true);
 
     if (landmarks.length === 0) {
       state.mode = 'error';
@@ -153,6 +166,13 @@ async function loadLandmarks(): Promise<void> {
   } catch (error) {
     console.error('[app] loadLandmarks error:', error);
     state.mode = 'error';
+
+    // Never leave the phone stuck on "Getting location..." / "finding landmarks...".
+    if (state.userLat != null && state.userLng != null) {
+      setPhoneLocationStatus(`${state.userLat.toFixed(3)}, ${state.userLng.toFixed(3)} · landmark lookup failed`, true);
+    } else {
+      setPhoneLocationStatus('Location unavailable');
+    }
 
     const locErr = error as LocationError;
     if (locErr.code === 'denied') {
