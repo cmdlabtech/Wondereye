@@ -12,6 +12,8 @@ export interface RawPOI {
   distance: number;
   wikipedia?: string;
   wikidata?: string;
+  /** English Wikidata short description: a disambiguation hint for Grok only, never shown or copied. */
+  hint?: string;
   description?: string;
   startDate?: string;
   architect?: string;

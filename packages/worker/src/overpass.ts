@@ -1,12 +1,32 @@
 import { RawPOI } from './types';
+import { haversineDistance, USER_AGENT } from './geo';
 
+// Healthy instances answer in 1–4 s. Anything slower is almost always an
+// overloaded server that will end in a 504/timeout anyway.
+const ENDPOINT_TIMEOUT_MS = 6_000;
+
+export interface OverpassOptions {
+  /** Epoch ms after which no new attempt is started and in-flight ones are cut short. */
+  deadline?: number;
+  /** Aborts the whole lookup (e.g. once the caller has settled on other results). */
+  signal?: AbortSignal;
+}
+
+/**
+ * Query public Overpass instances ONE AT A TIME until one answers.
+ * Resolves with the (possibly empty) POI list from the first instance that
+ * answers; rejects if every instance fails or the deadline passes.
+ */
 export async function queryOverpass(
   lat: number,
   lng: number,
-  radius: number
+  radius: number,
+  options: OverpassOptions = {}
 ): Promise<RawPOI[]> {
+  // [timeout:10]: the server-side budget also sets scheduling priority on
+  // overpass-api.de, and we never wait longer than ENDPOINT_TIMEOUT_MS anyway.
   const query = `
-    [out:json][timeout:25];
+    [out:json][timeout:10];
     (
       nwr["name"]["tourism"~"museum|attraction|viewpoint|artwork|gallery"](around:${radius},${lat},${lng});
       nwr["name"]["historic"~"monument|memorial|castle|archaeological_site"](around:${radius},${lat},${lng});
@@ -16,54 +36,62 @@ export async function queryOverpass(
     out center body qt;
   `;
 
+  // Planet-wide public instances, tried ONE AT A TIME. The overpass-api.de
+  // usage policy forbids fanning a query out to several servers in parallel
+  // ("do NOT work around that rule by distributing load over multiple
+  // servers"), and parallel fan-out is a fast way to get banned.
+  // overpass.kumi.systems is a CNAME of overpass.private.coffee (same box),
+  // so listing both only doubled load on one server.
   const endpoints = [
     'https://overpass-api.de/api/interpreter',
-    'https://overpass.kumi.systems/api/interpreter',
     'https://overpass.private.coffee/api/interpreter',
-    // Regional (Switzerland). Often 200 with zero elements outside CH — skip empties below.
-    'https://overpass.osm.ch/api/interpreter',
   ];
+  // Regional mirror with Switzerland-only data — useless (200 + 0 elements)
+  // anywhere else, so only consult it for Swiss coordinates.
+  if (isInSwitzerland(lat, lng)) endpoints.push('https://overpass.osm.ch/api/interpreter');
 
-  const ENDPOINT_TIMEOUT_MS = 20_000;
   const body = `data=${encodeURIComponent(query)}`;
   const headers = {
     'Content-Type': 'application/x-www-form-urlencoded',
     // Overpass instances require an identifying UA per OSM usage policy
     // (overpass-api.de returns 406 without one)
-    'User-Agent': 'Wondereye/1.6.2 (https://wondereye.app)',
+    'User-Agent': USER_AGENT,
   };
 
-  const elements = await new Promise<any[]>((resolve, reject) => {
-    let rejected = 0;
-    const total = endpoints.length;
-    for (const endpoint of endpoints) {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), ENDPOINT_TIMEOUT_MS);
-      fetch(endpoint, { method: 'POST', body, headers, signal: controller.signal })
-        .then(async (response) => {
-          if (!response.ok) throw new Error(`status ${response.status}`);
-          const parsed: any = await response.json();
-          if (!parsed || !Array.isArray(parsed.elements)) throw new Error('unexpected body');
-          // 200 with zero elements is a miss (regional mirrors), not "no POIs".
-          if (parsed.elements.length === 0) throw new Error('0 elements');
-          resolve(parsed.elements);
-        })
-        .catch((err) => {
-          const msg = err instanceof Error ? err.message : String(err);
-          console.warn(`[overpass] ${endpoint} failed: ${msg}`);
-          rejected++;
-          if (rejected === total) reject(new Error('Overpass API error: no response'));
-        })
-        .finally(() => clearTimeout(timer));
+  let elements: any[] | null = null;
+  for (const endpoint of endpoints) {
+    if (options.signal?.aborted) break;
+    const remaining = options.deadline ? options.deadline - Date.now() : ENDPOINT_TIMEOUT_MS;
+    if (remaining < 500) break; // not enough time left for a useful attempt
+    const signals = [AbortSignal.timeout(Math.min(ENDPOINT_TIMEOUT_MS, remaining))];
+    if (options.signal) signals.push(options.signal);
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        body,
+        headers,
+        signal: AbortSignal.any(signals),
+      });
+      if (!response.ok) throw new Error(`status ${response.status}`);
+      const parsed: any = await response.json();
+      if (!parsed || !Array.isArray(parsed.elements)) throw new Error('unexpected body');
+      elements = parsed.elements;
+      break;
+    } catch (err) {
+      if (options.signal?.aborted) break;
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[overpass] ${endpoint} failed: ${msg}`);
     }
-  });
+  }
 
-  const data = { elements };
+  if (!elements) {
+    throw new Error(options.signal?.aborted ? 'Overpass lookup cancelled' : 'Overpass API error: all instances failed');
+  }
 
   const seen = new Set<string>();
   const pois: RawPOI[] = [];
 
-  for (const element of data.elements) {
+  for (const element of elements) {
     const name = element.tags?.name;
     if (!name || seen.has(name)) continue;
     seen.add(name);
@@ -113,14 +141,7 @@ function optionalTag(
   return { [field]: value.slice(0, max) };
 }
 
-function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371000;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+// Rough bounding box for Switzerland (overpass.osm.ch only holds Swiss data).
+function isInSwitzerland(lat: number, lng: number): boolean {
+  return lat >= 45.8 && lat <= 47.9 && lng >= 5.9 && lng <= 10.6;
 }

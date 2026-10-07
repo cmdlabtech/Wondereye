@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { queryOverpass } from './overpass';
-import { generateDetail, generateSnippets, GROK_MATCH_MODEL } from './grok';
+import { findNearbyPOIs } from './places';
+import { cleanSnippet, generateDetail, generateSnippets, GROK_MATCH_MODEL } from './grok';
 import { Bindings, LandmarkDetailInput, LandmarkResponse } from './types';
 
 const MAX_RADIUS = 2000;
@@ -10,7 +10,7 @@ const CACHE_TTL = 7776000; // 90 days
 const DETAIL_CACHE_TTL = 7776000; // 90 days
 const PLACE_TTL = 7776000; // 90 days — short-term accumulator
 const MAP_CACHE_TTL = 3600; // 1 hour — aggregated /api/map response; expires naturally (writes no longer bust it)
-const CACHE_GEN = 'v2'; // bump when snippet/detail generation changes so stale KV copy is skipped
+const CACHE_GEN = 'v6'; // bump when snippet/detail generation changes so stale KV copy is skipped
 
 function cacheKey(lat: number, lng: number, radius: number): string {
   return `landmarks:${CACHE_GEN}:${lat.toFixed(3)}:${lng.toFixed(3)}:${radius}`;
@@ -75,7 +75,7 @@ interface MapPlace {
 // the dataset grows.
 function putMapPlace(kv: KVNamespace, lm: MapPlace): Promise<void> {
   if (!Number.isFinite(lm.lat) || !Number.isFinite(lm.lng)) return Promise.resolve();
-  const entry: MapPlace = { name: lm.name, type: lm.type, lat: lm.lat, lng: lm.lng, snippet: lm.snippet };
+  const entry: MapPlace = { name: lm.name, type: lm.type, lat: lm.lat, lng: lm.lng, snippet: cleanSnippet(lm.snippet || '') };
   const metadata: MapPlace = { ...entry };
   while (new TextEncoder().encode(JSON.stringify(metadata)).length > 1000 && metadata.snippet.length > 0) {
     metadata.snippet = metadata.snippet.slice(0, Math.max(0, metadata.snippet.length - 50)).trim();
@@ -171,7 +171,7 @@ app.post('/api/landmarks', async (c) => {
     const response = cached as LandmarkResponse;
     if (response.landmarks.length > 0) {
       if (response.landmarks[0].lat == null) {
-        // Old cached data without coordinates — backfill via Overpass
+        // Old cached data without coordinates — backfill via the POI lookup
         c.executionCtx.waitUntil(
           (async () => {
             const existing = await Promise.all(
@@ -179,7 +179,7 @@ app.post('/api/landmarks', async (c) => {
             );
             const missing = response.landmarks.filter((_, i) => existing[i] === null);
             if (missing.length === 0) return;
-            const pois = await queryOverpass(safeLat, safeLng, radius);
+            const pois = await findNearbyPOIs(safeLat, safeLng, radius);
             await Promise.all(
               missing.flatMap(lm => {
                 const poi = pois.find(p => p.name.toLowerCase() === lm.name.toLowerCase());
@@ -212,14 +212,14 @@ app.post('/api/landmarks', async (c) => {
 
   let pois;
   try {
-    pois = await queryOverpass(safeLat, safeLng, radius);
+    pois = await findNearbyPOIs(safeLat, safeLng, radius);
   } catch (err) {
-    console.error('[api] Overpass error:', err);
+    console.error('[api] POI lookup error:', err);
     return c.json({ error: 'Failed to fetch nearby places. Please try again.' }, 502);
   }
 
   if (pois.length === 0) {
-    // Do not cache empty results — could be a transient Overpass issue
+    // Do not cache empty results — could be a transient upstream issue
     return c.json({ landmarks: [] });
   }
 
@@ -444,7 +444,7 @@ app.get('/api/map', async (c) => {
     const dedupeKey = mapPlaceKey(e.name, e.lat, e.lng);
     if (seen.has(dedupeKey)) return false;
     seen.add(dedupeKey);
-    landmarks.push({ name: e.name, type: e.type, lat: e.lat, lng: e.lng, snippet: e.snippet });
+    landmarks.push({ name: e.name, type: e.type, lat: e.lat, lng: e.lng, snippet: cleanSnippet(e.snippet || '') });
     return true;
   };
 
