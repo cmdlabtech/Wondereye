@@ -1,6 +1,6 @@
 # Wondereye
 
-Discover nearby landmarks through your Even G2 smart glasses. Wondereye finds points of interest around you via OpenStreetMap, generates concise descriptions powered by Grok, and shows them right on your display — ranked by distance and significance.
+Discover nearby landmarks through your Even G2 smart glasses. Wondereye finds points of interest around you using OpenStreetMap and Wikipedia place data, and shows them right on your display, ranked by distance and significance. Landmark descriptions are written by Grok. Wikipedia is used only to find nearby places.
 
 - **Homepage:** https://wondereye.app
 - **Community map:** https://wondereye.app/map
@@ -17,8 +17,8 @@ Scan this QR code from the Even Hub app to load Wondereye on your glasses.
 
 ## Features
 
-- **Automatic landmark detection** — up to 5 nearby landmarks from real-world OpenStreetMap data, ranked by distance and significance
-- **Instant AI snippets**, with full background details on demand, powered by Grok
+- **Automatic landmark detection**: up to 5 nearby landmarks found with OpenStreetMap and Wikipedia place data, ranked by distance and significance
+- **Instant descriptions written by Grok**, with full background details on demand
 - **Compass direction and distance** to each landmark, shown right on the HUD
 - **Voice search** to find a specific landmark hands-free
 - **Adjustable search range** — tighten it for dense city centers or widen it to explore
