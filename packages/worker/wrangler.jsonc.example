@@ -26,7 +26,7 @@
   //                               wrangler secret put GITHUB_FEEDBACK_TOKEN
   "vars": {
     "FEEDBACK_ENABLED": "false",
-    "TURNSTILE_HOSTNAMES": "wondereye.app",
+    "TURNSTILE_HOSTNAMES": "wondereye.app,127.0.0.1",
     "FEEDBACK_REPO": "cmdlabtech/Wondereye"
   },
   "kv_namespaces": [

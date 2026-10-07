@@ -48,7 +48,7 @@ Worker `wondereye-api` (`packages/worker/wrangler.jsonc` stays gitignored):
 | `TURNSTILE_SECRET` | secret (`wrangler secret put`) | Secret key of a Turnstile widget (Managed mode) whose hostnames are `wondereye.app` (+ any app origin you choose, see below) |
 | `GITHUB_FEEDBACK_TOKEN` | secret | Fine-grained PAT, **Repository access: only `cmdlabtech/Wondereye`**, **Permissions: Issues → Read and write** (Metadata read is added automatically). Nothing else. Set an expiry. |
 | `FEEDBACK_ENABLED` | var | `"true"` to turn the endpoint on (absent = 503) |
-| `TURNSTILE_HOSTNAMES` | var (optional) | Comma list of hostnames siteverify may report. Default `wondereye.app` |
+| `TURNSTILE_HOSTNAMES` | var (optional) | Comma list of hostnames siteverify may report. Default `wondereye.app`; production sets `wondereye.app,127.0.0.1` so the glasses app (loopback origin) can submit |
 | `FEEDBACK_REPO` | var (optional) | Default `cmdlabtech/Wondereye` |
 | `FEEDBACK_DRY_RUN` | var (local only) | `"true"` logs the issue instead of calling GitHub |
 | `ALLOWED_ORIGIN` | var (existing) | Must include `https://wondereye.app` |
@@ -58,7 +58,7 @@ Site / app build time:
 
 | Name | Where | Value |
 |------|-------|-------|
-| `VITE_TURNSTILE_SITEKEY` | `packages/web` and `packages/frontend` builds | Public sitekey of the widget. Defaults to Cloudflare's always-pass test key `1x00000000000000000000AA`, which a production secret rejects, so a real key is required before enabling. |
+| `VITE_TURNSTILE_SITEKEY` | `packages/web` and `packages/frontend` builds | Public sitekey of the widget. Defaults to the production key `0x4AAAAAAFQyWWYVPcIJm6E7` (widget hostnames `wondereye.app`, `127.0.0.1`). For local preview override with Cloudflare's test key `1x00000000000000000000AA`. |
 | `VITE_FEEDBACK_API` | `packages/web` (optional) | Default `https://api.wondereye.app` |
 
 Recommended before enabling: pre-create the labels `feedback`,
@@ -94,5 +94,5 @@ GITHUB_FEEDBACK_TOKEN=dry-run
 TURNSTILE_HOSTNAMES=localhost,example.com
 
 cd packages/worker && npx wrangler dev --port 8787
-cd packages/web && VITE_FEEDBACK_API=http://localhost:8787 npm run dev
+cd packages/web && VITE_TURNSTILE_SITEKEY=1x00000000000000000000AA VITE_FEEDBACK_API=http://localhost:8787 npm run dev
 ```

@@ -2,7 +2,7 @@
 // nothing here holds a secret. The Turnstile sitekey is public by design.
 
 export const TURNSTILE_SITEKEY: string =
-  import.meta.env.VITE_TURNSTILE_SITEKEY || "1x00000000000000000000AA"; // Cloudflare's always-pass test key
+  import.meta.env.VITE_TURNSTILE_SITEKEY || "0x4AAAAAAFQyWWYVPcIJm6E7"; // public Turnstile sitekey (wondereye.app, 127.0.0.1)
 export const FEEDBACK_API: string = import.meta.env.VITE_FEEDBACK_API || "https://api.wondereye.app";
 
 export type FeedbackCategory = "bug" | "idea" | "other";

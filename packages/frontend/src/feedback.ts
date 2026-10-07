@@ -4,7 +4,7 @@
 // Turnstile sitekey is public by design.
 import { API_BASE_URL } from './constants';
 
-const SITEKEY: string = import.meta.env.VITE_TURNSTILE_SITEKEY || '1x00000000000000000000AA'; // Cloudflare test key
+const SITEKEY: string = import.meta.env.VITE_TURNSTILE_SITEKEY || '0x4AAAAAAFQyWWYVPcIJm6E7'; // public Turnstile sitekey (wondereye.app, 127.0.0.1)
 const GENERIC_ERROR = "Feedback couldn't be sent. Please try again later.";
 
 type TurnstileApi = {
