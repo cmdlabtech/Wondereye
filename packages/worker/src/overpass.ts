@@ -18,47 +18,47 @@ export async function queryOverpass(
 
   const endpoints = [
     'https://overpass-api.de/api/interpreter',
+    'https://overpass.kumi.systems/api/interpreter',
     'https://overpass.private.coffee/api/interpreter',
+    // Regional (Switzerland). Often 200 with zero elements outside CH — skip empties below.
     'https://overpass.osm.ch/api/interpreter',
   ];
 
-  const ENDPOINT_TIMEOUT_MS = 10_000;
+  const ENDPOINT_TIMEOUT_MS = 20_000;
+  const body = `data=${encodeURIComponent(query)}`;
+  const headers = {
+    'Content-Type': 'application/x-www-form-urlencoded',
+    // Overpass instances require an identifying UA per OSM usage policy
+    // (overpass-api.de returns 406 without one)
+    'User-Agent': 'Wondereye/1.6.2 (https://wondereye.app)',
+  };
 
-  let response: Response | undefined;
-  for (const endpoint of endpoints) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), ENDPOINT_TIMEOUT_MS);
-    try {
-      response = await fetch(endpoint, {
-        method: 'POST',
-        body: `data=${encodeURIComponent(query)}`,
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          // Overpass instances require an identifying UA per OSM usage policy
-          // (overpass-api.de returns 406 without one)
-          'User-Agent': 'Wondereye/1.5.0 (https://wondereye.app)',
-        },
-        signal: controller.signal,
-      });
-    } catch {
-      console.warn(`[overpass] ${endpoint} failed, trying next...`);
-      continue;
-    } finally {
-      clearTimeout(timer);
+  const elements = await new Promise<any[]>((resolve, reject) => {
+    let rejected = 0;
+    const total = endpoints.length;
+    for (const endpoint of endpoints) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), ENDPOINT_TIMEOUT_MS);
+      fetch(endpoint, { method: 'POST', body, headers, signal: controller.signal })
+        .then(async (response) => {
+          if (!response.ok) throw new Error(`status ${response.status}`);
+          const parsed: any = await response.json();
+          if (!parsed || !Array.isArray(parsed.elements)) throw new Error('unexpected body');
+          // 200 with zero elements is a miss (regional mirrors), not "no POIs".
+          if (parsed.elements.length === 0) throw new Error('0 elements');
+          resolve(parsed.elements);
+        })
+        .catch((err) => {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn(`[overpass] ${endpoint} failed: ${msg}`);
+          rejected++;
+          if (rejected === total) reject(new Error('Overpass API error: no response'));
+        })
+        .finally(() => clearTimeout(timer));
     }
-    if (response.ok) break;
-    console.warn(`[overpass] ${endpoint} returned ${response.status}, trying next...`);
-  }
+  });
 
-  if (!response || !response.ok) {
-    throw new Error(`Overpass API error: ${response?.status ?? 'no response'}`);
-  }
-
-  const data: any = await response.json();
-
-  if (!data || !Array.isArray(data.elements)) {
-    throw new Error('Unexpected Overpass response format');
-  }
+  const data = { elements };
 
   const seen = new Set<string>();
   const pois: RawPOI[] = [];
@@ -78,11 +78,39 @@ export async function queryOverpass(
     const type = specificBuilding || element.tags.amenity || element.tags.historic || element.tags.tourism || 'landmark';
 
     const distance = haversineDistance(lat, lng, elLat, elLng);
+    const tags = element.tags as Record<string, string> | undefined;
 
-    pois.push({ name, type, lat: elLat, lng: elLng, distance: Math.round(distance) });
+    pois.push({
+      name,
+      type,
+      lat: elLat,
+      lng: elLng,
+      distance: Math.round(distance),
+      ...(optionalTag(tags, 'wikipedia', 150, 'wikipedia')),
+      ...(optionalTag(tags, 'wikidata', 40, 'wikidata')),
+      ...(optionalTag(tags, 'description:en', 240, 'description')
+        ?? optionalTag(tags, 'description', 240, 'description')),
+      ...(optionalTag(tags, 'start_date', 40, 'startDate')),
+      ...(optionalTag(tags, 'architect', 80, 'architect')
+        ?? optionalTag(tags, 'artist_name', 80, 'architect')),
+      ...(optionalTag(tags, 'addr:city', 80, 'city')
+        ?? optionalTag(tags, 'addr:suburb', 80, 'city')
+        ?? optionalTag(tags, 'is_in:city', 80, 'city')),
+    });
   }
 
   return pois.sort((a, b) => a.distance - b.distance).slice(0, 20);
+}
+
+function optionalTag(
+  tags: Record<string, string> | undefined,
+  osmKey: string,
+  max: number,
+  field: string,
+): Record<string, string> | undefined {
+  const value = tags?.[osmKey]?.trim();
+  if (!value) return undefined;
+  return { [field]: value.slice(0, max) };
 }
 
 function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {

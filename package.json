@@ -4,11 +4,13 @@
   "private": true,
   "workspaces": [
     "packages/frontend",
-    "packages/worker"
+    "packages/worker",
+    "packages/web"
   ],
   "scripts": {
     "dev:frontend": "npm run dev --workspace=packages/frontend",
     "dev:worker": "npm run dev --workspace=packages/worker",
+    "dev:web": "npm run dev --workspace=packages/web",
     "dev": "concurrently \"npm run dev:worker\" \"npm run dev:frontend\"",
     "dev:sim": "bash scripts/dev-sim.sh",
     "dev:lan": "bash scripts/dev-local.sh",

@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { queryOverpass } from './overpass';
-import { generateSnippets } from './grok';
-import { Bindings, LandmarkResponse } from './types';
+import { generateDetail, generateSnippets, GROK_MATCH_MODEL } from './grok';
+import { Bindings, LandmarkDetailInput, LandmarkResponse } from './types';
 
 const MAX_RADIUS = 2000;
 const MIN_RADIUS = 50;
@@ -10,9 +10,18 @@ const CACHE_TTL = 7776000; // 90 days
 const DETAIL_CACHE_TTL = 7776000; // 90 days
 const PLACE_TTL = 7776000; // 90 days — short-term accumulator
 const MAP_CACHE_TTL = 3600; // 1 hour — aggregated /api/map response; expires naturally (writes no longer bust it)
+const CACHE_GEN = 'v2'; // bump when snippet/detail generation changes so stale KV copy is skipped
 
 function cacheKey(lat: number, lng: number, radius: number): string {
-  return `landmarks:${lat.toFixed(3)}:${lng.toFixed(3)}:${radius}`;
+  return `landmarks:${CACHE_GEN}:${lat.toFixed(3)}:${lng.toFixed(3)}:${radius}`;
+}
+
+function detailCacheKey(name: string, unitSystem: string, lat?: number, lng?: number): string {
+  const slug = slugify(name);
+  if (typeof lat === 'number' && typeof lng === 'number') {
+    return `detail:${CACHE_GEN}:${slug}:${lat.toFixed(3)}:${lng.toFixed(3)}:${unitSystem}`;
+  }
+  return `detail:${CACHE_GEN}:${slug}:${unitSystem}`;
 }
 
 // Non-Latin names (e.g. CJK) have no a-z0-9 characters, so the ASCII slug
@@ -26,6 +35,18 @@ function slugify(name: string): string {
     hash = (hash * 31 + name.charCodeAt(i)) | 0;
   }
   return `n${(hash >>> 0).toString(36)}`;
+}
+
+function optionalCoord(value: unknown, min: number, max: number): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < min || value > max) return undefined;
+  return value;
+}
+
+function optionalText(value: unknown, max: number): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const text = value.replace(/["\\]/g, ' ').replace(/[\r\n]/g, ' ').trim();
+  if (!text) return undefined;
+  return text.slice(0, max);
 }
 
 function placeKey(name: string): string {
@@ -203,7 +224,7 @@ app.post('/api/landmarks', async (c) => {
   }
 
   try {
-    const landmarks = await generateSnippets(pois, c.env.XAI_API_KEY);
+    const landmarks = await generateSnippets(pois, c.env.XAI_API_KEY, { lat: safeLat, lng: safeLng });
     const response: LandmarkResponse = { landmarks };
     if (landmarks.length === 0) {
       return c.json(response);
@@ -246,48 +267,33 @@ app.post('/api/landmark-detail', async (c) => {
     return c.json({ error: 'name is required (string, max 200 chars)' }, 400);
   }
   const unitSystem: 'imperial' | 'metric' = units === 'metric' ? 'metric' : 'imperial';
-  const unitHint = unitSystem === 'metric'
-    ? 'Use metric units (meters, kilometers) for any distances or measurements.'
-    : 'Use imperial units (feet, miles) for any distances or measurements.';
+  const lat = optionalCoord(body.lat, -90, 90);
+  const lng = optionalCoord(body.lng, -180, 180);
 
-  const detailKey = `detail:${name.toLowerCase().trim()}:${unitSystem}`;
+  const detailKey = detailCacheKey(name, unitSystem, lat, lng);
   const cachedDetail = await c.env.LANDMARKS_CACHE.get(detailKey, 'json');
   if (cachedDetail) {
     return c.json(cachedDetail);
   }
 
-  const safeName = name.replace(/["\\]/g, ' ').replace(/[\r\n]/g, ' ').trim();
+  const input: LandmarkDetailInput = {
+    name: name.replace(/["\\]/g, ' ').replace(/[\r\n]/g, ' ').trim(),
+    units: unitSystem,
+    lat,
+    lng,
+    type: optionalText(body.type, 80),
+    distance: typeof body.distance === 'number' && Number.isFinite(body.distance) ? body.distance : undefined,
+    snippet: optionalText(body.snippet, 400),
+    wikipedia: optionalText(body.wikipedia, 150),
+    wikidata: optionalText(body.wikidata, 40),
+    description: optionalText(body.description, 240),
+    startDate: optionalText(body.startDate, 40),
+    architect: optionalText(body.architect, 80),
+    city: optionalText(body.city, 80),
+  };
 
   try {
-    const res = await fetch('https://api.x.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${c.env.XAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'grok-4-1-fast-non-reasoning',
-        max_tokens: 400,
-        messages: [
-          {
-            role: 'system',
-            content: `You are a knowledgeable tour guide. Look up every landmark in Grokipedia first to ensure accurate, factual information. Write in plain text with no markdown, no bullet points, no special formatting. ${unitHint}`,
-          },
-          {
-            role: 'user',
-            content: `Using Grokipedia, give a concise background on the landmark "${safeName}". Include what it is, its history, why it's notable, and one interesting fact. Keep it under 800 characters.`,
-          },
-        ],
-      }),
-    });
-
-    if (!res.ok) {
-      console.error('[api] Grok API error:', res.status);
-      return c.json({ detail: '' });
-    }
-
-    const data: any = await res.json();
-    const text = data.choices?.[0]?.message?.content || '';
+    const text = await generateDetail(input, c.env.XAI_API_KEY);
     if (text) {
       c.executionCtx.waitUntil(
         c.env.LANDMARKS_CACHE.put(detailKey, JSON.stringify({ detail: text }), {
@@ -372,8 +378,9 @@ app.post('/api/transcribe', async (c) => {
         'Authorization': `Bearer ${c.env.XAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'grok-4-1-fast-non-reasoning',
-        max_tokens: 60,
+        model: GROK_MATCH_MODEL,
+        reasoning_effort: 'none',
+        max_completion_tokens: 60,
         messages: [
           {
             role: 'system',

@@ -1,0 +1,308 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #000000;
+  --color-surface: #0e0e0e;
+  --color-surface-2: #171717;
+  --color-fg: #ffffff;
+  --color-muted: #8d8d8d;
+  --color-primary: #ffffff;
+  --color-primary-dim: #c8c8c8;
+  --color-ink: #111111;
+  --color-paper: #ffffff;
+  --color-paper-hover: #f4f4f4;
+  --color-border: #ffffff29;
+  --color-ring-hover: #ffffff47;
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Syne", ui-sans-serif, system-ui, sans-serif;
+  --shadow-ring: 0 0 0 1px #ffffff29;
+  --shadow-ring-hover: 0 0 0 1px #ffffff47;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-morph: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+    color-scheme: dark;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background: var(--color-bg);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+    font-family: var(--font-display);
+    font-weight: 500;
+    letter-spacing: -0.04em;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+}
+
+@layer components {
+  .chrome {
+    background: var(--color-surface);
+    color: var(--color-fg);
+    box-shadow: var(--shadow-ring);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    padding: 0 1.1rem 0 1.2rem;
+    border-radius: 0;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    line-height: 1;
+    transition:
+      transform 150ms ease-out,
+      background-color 150ms var(--ease-out),
+      box-shadow 150ms var(--ease-out),
+      color 150ms var(--ease-out);
+  }
+
+  .btn:active:not(:disabled) {
+    transform: scale(0.96);
+  }
+
+  .btn:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  .btn-solid {
+    background: var(--color-paper);
+    color: var(--color-ink);
+  }
+
+  .btn-solid:hover {
+    background: var(--color-paper-hover);
+  }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--color-fg);
+    box-shadow: var(--shadow-ring);
+  }
+
+  .btn-ghost:hover {
+    box-shadow: var(--shadow-ring-hover);
+    background: var(--color-surface);
+  }
+
+  .rise {
+    animation: rise 500ms var(--ease-out) both;
+  }
+
+  .rise-2 {
+    animation-delay: 80ms;
+  }
+
+  .rise-3 {
+    animation-delay: 160ms;
+  }
+
+  .rise-4 {
+    animation-delay: 240ms;
+  }
+
+  .pin-card {
+    background: var(--color-paper);
+    color: var(--color-ink);
+    box-shadow: var(--shadow-ring), 0 18px 40px rgb(0 0 0 / 0.35);
+    border-radius: 0;
+    display: flex;
+    flex-direction: column;
+    max-height: min(70vh, 30rem);
+    animation: rise 250ms var(--ease-out) both;
+  }
+
+  .pin-card-copy {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .pin-diamond {
+    display: grid;
+    width: 0.7rem;
+    height: 0.7rem;
+    flex-shrink: 0;
+    place-items: center;
+    border: 1px solid currentColor;
+    background: transparent;
+    transform: rotate(45deg);
+  }
+
+  .pin-diamond i {
+    display: block;
+    width: 38%;
+    height: 38%;
+    border: 1px solid color-mix(in srgb, currentColor 45%, transparent);
+    background: color-mix(in srgb, currentColor 22%, transparent);
+  }
+
+  .pin-tip {
+    background: var(--color-paper);
+    color: var(--color-ink);
+    box-shadow: var(--shadow-ring), 0 8px 20px rgb(0 0 0 / 0.28);
+    border-radius: 0;
+  }
+
+  .globe-frame {
+    position: fixed;
+    z-index: 2;
+    overflow: hidden;
+    pointer-events: none;
+    opacity: 0;
+    background: #000;
+    transform-origin: 50% 50%;
+  }
+
+  .globe-frame.is-painted {
+    opacity: 1;
+  }
+
+  .globe-frame.is-hero {
+    z-index: 4;
+    will-change: transform;
+  }
+
+  .globe-frame.is-live {
+    z-index: 1;
+    pointer-events: auto;
+  }
+
+  .globe-frame.is-morphing {
+    z-index: 30;
+    will-change: transform;
+  }
+
+  .globe-host {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background: #000;
+  }
+
+  .globe-frame.is-live .globe-host,
+  .globe-frame.is-live canvas {
+    pointer-events: auto;
+    touch-action: none;
+  }
+
+  .landing-leave {
+    transition: opacity 1300ms var(--ease-morph);
+  }
+
+  .is-leaving {
+    pointer-events: none;
+  }
+
+  .is-leaving .landing-leave {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .map-chrome-enter {
+    animation: fade-in 700ms 80ms var(--ease-morph) both;
+  }
+
+  .hero-orb {
+    display: block;
+    position: relative;
+    z-index: 5;
+    aspect-ratio: 1;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background-color: #000;
+    background-image: radial-gradient(circle at 32% 28%, #4a4a4a 0%, #1a1a1a 28%, #0a0a0a 54%, #000 76%);
+    box-shadow: var(--shadow-ring);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    appearance: none;
+    transition: opacity 1300ms var(--ease-morph);
+  }
+
+  .hero-orb:hover:not(:disabled) {
+    box-shadow: var(--shadow-ring-hover);
+  }
+
+  .hero-orb:disabled {
+    cursor: default;
+    opacity: 1;
+  }
+
+  html.globe-on .hero-orb {
+    background-image: none;
+    background-color: transparent;
+  }
+
+  .is-leaving .hero-orb {
+    opacity: 0;
+  }
+
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .rise {
+    animation: none;
+  }
+}

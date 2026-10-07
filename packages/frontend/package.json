@@ -4,7 +4,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "deploy": "npm run build && wrangler deploy",
+    "deploy": "node ../../scripts/compose-site.mjs && wrangler deploy",
     "build:ehpk": "vite build --mode ehpk --base ./ --outDir dist-ehpk",
     "pack": "npm run build:ehpk && cp dist-ehpk/app.html dist-ehpk/index.html && evenhub pack app.json dist-ehpk -o wondereye.ehpk && rm -rf dist-ehpk"
   },
