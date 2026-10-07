@@ -1,9 +1,12 @@
 import { useLayoutEffect, useMemo, useRef } from "react";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Heart } from "lucide-react";
 import { PinIcon, Wordmark } from "@/components/wordmark";
 import { useGlobeSession, useOpenLandmark, useOpenMap } from "@/lib/globe-session";
 import { formatType, pickFeatured } from "@/lib/landmarks";
 import { cn } from "@/lib/cn";
+
+// Locked PayPal donate button (same link as the glasses app settings page and /support).
+const DONATE_URL = "https://www.paypal.com/donate/?hosted_button_id=Z5SDZULELYGNS";
 
 const STEPS = [
   {
@@ -182,7 +185,18 @@ export function LandingPage() {
             <PinIcon className="h-2.5 text-primary" />
             Wondereye
           </p>
-          <p>Earth: NASA Blue Marble · Drag to orbit · scroll to zoom</p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
+            <p>Earth: NASA Blue Marble · Drag to orbit · scroll to zoom</p>
+            <a
+              href={DONATE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 font-medium text-primary underline-offset-4 transition-colors hover:text-primary-dim hover:underline"
+            >
+              <Heart className="h-3 w-3" aria-hidden="true" />
+              Support Wondereye
+            </a>
+          </div>
         </div>
       </footer>
     </div>
