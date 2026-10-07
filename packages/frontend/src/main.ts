@@ -64,19 +64,16 @@ function renderContributions(entries: HistoryEntry[]): void {
   lastEntries = entries;
 
   list.replaceChildren();
+  // Collapsed row shows just a count badge next to "My Map Contributions".
+  summary.textContent = entries.length.toLocaleString(intlLocale());
 
   if (entries.length === 0) {
-    summary.textContent = t('p.noContrib');
     const empty = document.createElement('div');
     empty.className = 'contrib-empty';
     empty.textContent = t('p.contribEmpty');
     list.appendChild(empty);
     return;
   }
-
-  summary.textContent = entries.length === 1
-    ? t('p.contribOne')
-    : t('p.contribMany', { n: entries.length });
 
   for (const entry of entries) {
     const date = new Date(entry.visitedAt).toLocaleDateString(intlLocale(), { month: 'short', day: 'numeric' });
@@ -284,26 +281,17 @@ function initRadiusControl(): void {
 }
 
 function initGeoToggle(): void {
-  const onBtn = document.getElementById('geo-on');
-  const offBtn = document.getElementById('geo-off');
-  if (!onBtn || !offBtn) return;
+  const toggle = document.getElementById('geo-switch');
+  if (!toggle) return;
 
-  const refresh = () => {
-    const enabled = getGeoEnabled();
-    onBtn.classList.toggle('active', enabled);
-    offBtn.classList.toggle('active', !enabled);
-  };
-
+  const refresh = () => toggle.setAttribute('aria-checked', String(getGeoEnabled()));
   refresh();
 
-  const set = (enabled: boolean) => {
-    setGeoEnabled(enabled);
+  toggle.addEventListener('click', () => {
+    setGeoEnabled(!getGeoEnabled());
     refresh();
     loadLandmarks().catch(() => {});
-  };
-
-  onBtn.addEventListener('click', () => set(true));
-  offBtn.addEventListener('click', () => set(false));
+  });
 }
 
 // Best-effort: open external links (map, supporter) in the phone's browser.

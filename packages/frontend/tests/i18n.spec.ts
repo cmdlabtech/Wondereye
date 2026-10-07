@@ -8,6 +8,7 @@ import {
   BORDERED_INNER, CONTENT_INNER, PAGE_LINES, missingGlyphs, paginateByLines, spreadLine, alignRight, textWidth, fitWidth,
 } from '../src/text-fit';
 import { measureTextWrap } from '@evenrealities/pretext';
+import { readFileSync } from 'node:fs';
 
 // Node has no localStorage; give i18n.ts a tiny in-memory one.
 const store = new Map<string, string>();
@@ -157,5 +158,14 @@ describe('pixel pagination', () => {
   it('flags glyphs the font lacks', () => {
     expect(missingGlyphs('กข')).toEqual(['ก', 'ข']);
     expect(missingGlyphs('한국어 日本語 中文')).toEqual([]);
+  });
+});
+
+describe('settings page markup', () => {
+  it('every data-i18n key in app.html exists in the dictionaries', () => {
+    const html = readFileSync(new URL('../app.html', import.meta.url), 'utf8');
+    const used = [...html.matchAll(/data-i18n(?:-placeholder|-aria)?="([^"]+)"/g)].map((m) => m[1]);
+    expect(used.length).toBeGreaterThan(10);
+    for (const k of used) expect(keys, k).toContain(k);
   });
 });

@@ -10,6 +10,9 @@
 - Dates are shown in the format of your language. Metric units are the default for languages other than English until you choose a unit.
 - Only English descriptions are added to the community map at this time.
 
+### Phone settings
+- The settings page has a more compact layout and now fits on a single phone screen. Connection and location status appear on one line, settings are grouped in one card with a language menu, an inline range slider, a units selector, and a device location switch, and My Map Contributions and Send Feedback are collapsed rows at the bottom.
+
 ### Feedback
 - A Send Feedback form is now available in the phone settings page and on the wondereye.app map. You may report a bug, suggest an idea, or share other comments without providing an email address or creating an account.
 - Submitted feedback is posted to the public Wondereye issue tracker on GitHub for review. Please do not include personal information in your message.
