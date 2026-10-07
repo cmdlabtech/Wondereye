@@ -1,4 +1,4 @@
-export const USER_AGENT = 'Wondereye/1.6.6 (https://wondereye.app)';
+export const USER_AGENT = 'Wondereye/1.7.0 (https://wondereye.app)';
 
 export function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371000;

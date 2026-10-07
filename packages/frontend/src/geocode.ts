@@ -1,9 +1,11 @@
+import { getLang } from './i18n';
+
 export async function reverseGeocode(lat: number, lng: number): Promise<string> {
   try {
     // Round to 2 decimal places (~1.1km precision) before sending to external service
     const safeLat = Math.round(lat * 100) / 100;
     const safeLng = Math.round(lng * 100) / 100;
-    const url = `https://nominatim.openstreetmap.org/reverse?lat=${safeLat}&lon=${safeLng}&format=json&zoom=10`;
+    const url = `https://nominatim.openstreetmap.org/reverse?lat=${safeLat}&lon=${safeLng}&format=json&zoom=10&accept-language=${getLang()}`;
     const res = await fetch(url, {
       headers: { 'User-Agent': 'G2-LandmarkExplorer/1.0' },
     });

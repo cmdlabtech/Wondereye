@@ -1,6 +1,17 @@
 # Changelog
 
-## v1.6.6 - Unreleased
+## v1.7.0 - 2026-10-07
+
+### Languages
+- Wondereye is now available in English, German, French, Spanish, Italian, Simplified Chinese, Japanese, and Korean. The glasses display, the phone settings page, the feedback form, and error messages are shown in your language.
+- The language is selected automatically from the Even Realities App or phone language and defaults to English when your language is not supported. You may choose a different language at any time under Settings > Language.
+- Landmark descriptions are written by Grok directly in the selected language. Place names are kept in their local or official form, and the same accuracy rules apply in every language. No Wikipedia text is used in descriptions.
+- Text on the glasses is now measured against the glasses font, so longer words and Chinese, Japanese, and Korean characters fit each line and page without being cut off.
+- Dates are shown in the format of your language. Metric units are the default for languages other than English until you choose a unit.
+- Only English descriptions are added to the community map at this time.
+
+### Phone settings
+- The settings page has a more compact layout and now fits on a single phone screen. Glasses connection and location status are shown as icons with a colored status indicator in the title bar, and the full status is available as a tooltip. Settings are grouped in one card with a language menu, an inline range slider, a units selector, and a device location switch, and My Map Contributions and Send Feedback are collapsed rows at the bottom.
 
 ### Feedback
 - A Send Feedback form is now available in the phone settings page and on the wondereye.app map. You may report a bug, suggest an idea, or share other comments without providing an email address or creating an account.
@@ -9,6 +20,7 @@
 
 ### Platform
 - The network allowlist now includes Cloudflare Turnstile (`challenges.cloudflare.com`), which is required for feedback verification.
+- Wondereye 1.7.0 requires Even Realities App 2.2.9 or later.
 
 ## v1.6.5 - 2026-09-26
 

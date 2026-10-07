@@ -1,13 +1,13 @@
 {
   "package_id": "app.wondereye",
   "edition": "202601",
-  "version": "1.6.6",
+  "version": "1.7.0",
   "min_sdk_version": "0.0.14",
   "name": "Wondereye",
   "tagline": "Look out, not down. Discover landmarks through your glasses.",
   "description": "Wondereye identifies nearby landmarks and delivers instant background powered by Grok - all on your Even G2 smart glasses.",
   "author": "cmdlabtech",
-  "supported_languages": ["en"],
+  "supported_languages": ["en", "de", "fr", "es", "it", "zh", "ja", "ko"],
   "permissions": [
     { "name": "network", "desc": "Fetch landmark data and send feedback through the Wondereye API", "whitelist": ["https://api.wondereye.app", "https://nominatim.openstreetmap.org", "https://wondereye.app", "https://www.paypal.com", "https://challenges.cloudflare.com"] },
     { "name": "location", "desc": "Find landmarks near your current position" },

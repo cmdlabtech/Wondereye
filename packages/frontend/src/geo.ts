@@ -2,6 +2,7 @@ import { AppLocationAccuracy } from '@evenrealities/even_hub_sdk';
 import type { AppLocation, AppLocationOptions } from '@evenrealities/even_hub_sdk';
 import { getBridge } from './bridge';
 import { getGeoEnabled } from './geo-settings';
+import { t } from './i18n';
 
 export type LocationError =
   | { code: 'unsupported'; message: string }
@@ -62,7 +63,7 @@ function requestAppLocation(opts: AppLocationOptions, hardTimeoutMs: number): Pr
   let guard: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
     guard = setTimeout(() => {
-      reject({ code: 'timeout', message: 'Location request timed out.' } as LocationError);
+      reject({ code: 'timeout', message: t('e.locTimeout') } as LocationError);
     }, hardTimeoutMs);
   });
 
@@ -71,7 +72,7 @@ function requestAppLocation(opts: AppLocationOptions, hardTimeoutMs: number): Pr
     .then((loc) => {
       if (!isValidFix(loc)) {
         // Host returned no result (null) or invalid coordinates
-        throw { code: 'unavailable', message: 'Location unavailable.' } as LocationError;
+        throw { code: 'unavailable', message: t('e.locUnavailable') } as LocationError;
       }
       return { lat: loc.latitude, lng: loc.longitude };
     })
@@ -82,9 +83,9 @@ function requestAppLocation(opts: AppLocationOptions, hardTimeoutMs: number): Pr
       // treat as unavailable (covers hosts without the location method).
       const msg = e instanceof Error ? e.message : String(e);
       if (/denied|permission/i.test(msg)) {
-        throw { code: 'denied', message: 'Location permission denied.' } as LocationError;
+        throw { code: 'denied', message: t('e.locDenied') } as LocationError;
       }
-      throw { code: 'unavailable', message: 'Location unavailable.' } as LocationError;
+      throw { code: 'unavailable', message: t('e.locUnavailable') } as LocationError;
     });
 
   return Promise.race([request, timeout]).finally(() => clearTimeout(guard));
@@ -105,13 +106,13 @@ function requestAppLocation(opts: AppLocationOptions, hardTimeoutMs: number): Pr
  */
 export async function getCurrentPosition(): Promise<{ lat: number; lng: number }> {
   if (!getGeoEnabled()) {
-    throw { code: 'denied', message: 'Device location is turned off in settings.' } as LocationError;
+    throw { code: 'denied', message: t('e.locOff') } as LocationError;
   }
 
   try {
     getBridge();
   } catch {
-    throw { code: 'unsupported', message: 'Even app bridge is not available.' } as LocationError;
+    throw { code: 'unsupported', message: t('e.noBridge') } as LocationError;
   }
 
   // Try a high-accuracy fix first, then fall back to a faster low-accuracy

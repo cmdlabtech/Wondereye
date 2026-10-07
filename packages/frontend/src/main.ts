@@ -13,6 +13,9 @@ import { getUnits, setUnits } from './units';
 import { getRadius, setRadius, RADIUS_MIN, RADIUS_MAX } from './radius';
 import { getGeoEnabled, setGeoEnabled } from './geo-settings';
 import { initFeedbackForm } from './feedback';
+import { LandmarkApiError } from './api';
+import { detectDeviceLocale, getLang, getLangPreference, intlLocale, LANGS, LANGUAGE_NAMES, onLangChange, setLangPreference, t, type LangPreference } from './i18n';
+import { applyI18n } from './i18n-dom';
 
 const state: AppState = {
   landmarks: [],
@@ -29,45 +32,66 @@ let firstLoad = true;
 const FALLBACK_LAT = 50.090167;
 const FALLBACK_LNG = 14.401917;
 
-function setPhoneStatus(text: string) {
-  const el = document.getElementById('connection-status');
-  if (el) el.textContent = text;
-}
+// Phone status lines are stored as functions so they re-render in the new
+// language when the user switches languages.
+let connectionText: () => string = () => t('p.connecting');
+let locationText: () => string = () => t('p.waiting');
+let lastEntries: HistoryEntry[] | null = null;
 
-function setPhoneDot(id: string, state: 'active' | 'loading' | 'off') {
+type DotState = 'active' | 'loading' | 'error';
+
+// The status icons have no visible text: the state lives in the dot colour and
+// in a localized tooltip / aria-label ("Location: Prague").
+function setStatusLabel(id: string, labelKey: 'p.glasses' | 'p.location', value: string) {
   const el = document.getElementById(id);
   if (!el) return;
-  el.className = 'dot' + (state !== 'off' ? ' ' + state : '');
+  const label = t('p.statusFmt', { label: t(labelKey), value });
+  el.setAttribute('aria-label', label);
+  el.title = label;
 }
 
-function setPhoneLocationStatus(text: string, active = false) {
-  const el = document.getElementById('location-status');
-  if (el) el.textContent = text;
-  setPhoneDot('location-dot', active ? 'active' : 'off');
+function paintStatusLabels() {
+  setStatusLabel('glasses-status', 'p.glasses', connectionText());
+  setStatusLabel('location-status-icon', 'p.location', locationText());
+}
+
+function setPhoneStatus(text: () => string) {
+  connectionText = text;
+  paintStatusLabels();
+}
+
+function setPhoneDot(id: string, state: DotState) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.className = 'dot ' + state;
+}
+
+function setPhoneLocationStatus(text: () => string, state: DotState) {
+  locationText = text;
+  paintStatusLabels();
+  setPhoneDot('location-dot', state);
 }
 
 function renderContributions(entries: HistoryEntry[]): void {
   const summary = document.getElementById('contrib-summary');
   const list = document.getElementById('contrib-list');
   if (!summary || !list) return;
+  lastEntries = entries;
 
   list.replaceChildren();
+  // Collapsed row shows just a count badge next to "My Map Contributions".
+  summary.textContent = entries.length.toLocaleString(intlLocale());
 
   if (entries.length === 0) {
-    summary.textContent = 'No contributions yet';
     const empty = document.createElement('div');
     empty.className = 'contrib-empty';
-    empty.textContent = 'Landmarks you view on your glasses are added to the community map and will appear here.';
+    empty.textContent = t('p.contribEmpty');
     list.appendChild(empty);
     return;
   }
 
-  summary.textContent = entries.length === 1
-    ? '1 landmark contributed'
-    : `${entries.length} landmarks contributed`;
-
   for (const entry of entries) {
-    const date = new Date(entry.visitedAt).toLocaleDateString('en', { month: 'short', day: 'numeric' });
+    const date = new Date(entry.visitedAt).toLocaleDateString(intlLocale(), { month: 'short', day: 'numeric' });
     const type = entry.type.replace(/_/g, ' ');
 
     const item = document.createElement('div');
@@ -127,7 +151,7 @@ async function loadLandmarks(): Promise<void> {
       await renderLoading();
     }
 
-    setPhoneLocationStatus('Getting location...');
+    setPhoneLocationStatus(() => t('p.gettingLocation'), 'loading');
     const { lat, lng } = await getLocation();
 
     // Location is resolved at this point. Say so right away: previously the
@@ -135,7 +159,7 @@ async function loadLandmarks(): Promise<void> {
     // and, if that fetch failed, forever — which made an API outage look
     // like a stuck GPS fix.
     const coords = `${lat.toFixed(3)}, ${lng.toFixed(3)}`;
-    setPhoneLocationStatus(`${coords} · finding landmarks...`, true);
+    setPhoneLocationStatus(() => t('p.finding', { coords }), 'active');
 
     // Store coordinates for compass bearing calculations; reset compass calibration
     state.userLat = lat;
@@ -147,11 +171,11 @@ async function loadLandmarks(): Promise<void> {
       reverseGeocode(lat, lng),
     ]);
 
-    setPhoneLocationStatus(city || coords, true);
+    setPhoneLocationStatus(() => city || coords, 'active');
 
     if (landmarks.length === 0) {
       state.mode = 'error';
-      state.errorMessage = 'No landmarks found nearby.\nTry moving to a new area.';
+      state.errorMessage = t('e.noLandmarks');
       await renderError(state.errorMessage);
       return;
     }
@@ -170,9 +194,10 @@ async function loadLandmarks(): Promise<void> {
 
     // Never leave the phone stuck on "Getting location..." / "finding landmarks...".
     if (state.userLat != null && state.userLng != null) {
-      setPhoneLocationStatus(`${state.userLat.toFixed(3)}, ${state.userLng.toFixed(3)} · landmark lookup failed`, true);
+      const coords = `${state.userLat.toFixed(3)}, ${state.userLng.toFixed(3)}`;
+      setPhoneLocationStatus(() => t('p.lookupFailed', { coords }), 'active');
     } else {
-      setPhoneLocationStatus('Location unavailable');
+      setPhoneLocationStatus(() => t('p.locUnavailable'), 'error');
     }
 
     const locErr = error as LocationError;
@@ -181,7 +206,7 @@ async function loadLandmarks(): Promise<void> {
     } else if (locErr.code === 'unsupported') {
       state.errorMessage = locErr.message;
     } else {
-      state.errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      state.errorMessage = error instanceof LandmarkApiError ? error.message : t('e.unknown');
     }
 
     try {
@@ -271,26 +296,17 @@ function initRadiusControl(): void {
 }
 
 function initGeoToggle(): void {
-  const onBtn = document.getElementById('geo-on');
-  const offBtn = document.getElementById('geo-off');
-  if (!onBtn || !offBtn) return;
+  const toggle = document.getElementById('geo-switch');
+  if (!toggle) return;
 
-  const refresh = () => {
-    const enabled = getGeoEnabled();
-    onBtn.classList.toggle('active', enabled);
-    offBtn.classList.toggle('active', !enabled);
-  };
-
+  const refresh = () => toggle.setAttribute('aria-checked', String(getGeoEnabled()));
   refresh();
 
-  const set = (enabled: boolean) => {
-    setGeoEnabled(enabled);
+  toggle.addEventListener('click', () => {
+    setGeoEnabled(!getGeoEnabled());
     refresh();
     loadLandmarks().catch(() => {});
-  };
-
-  onBtn.addEventListener('click', () => set(true));
-  offBtn.addEventListener('click', () => set(false));
+  });
 }
 
 // Best-effort: open external links (map, supporter) in the phone's browser.
@@ -308,6 +324,29 @@ function initExternalLinks(): void {
       if (opened) e.preventDefault(); // avoid a second navigation if it worked
     });
   });
+}
+
+function initLanguagePicker(): void {
+  const select = document.getElementById('lang-select') as HTMLSelectElement | null;
+  if (!select) return;
+  const render = () => {
+    const pref = getLangPreference();
+    select.replaceChildren(
+      new Option(t('p.languageAuto'), 'auto', false, pref === 'auto'),
+      ...LANGS.map((l) => new Option(LANGUAGE_NAMES[l], l, false, pref === l)),
+    );
+  };
+  render();
+  select.addEventListener('change', () => setLangPreference(select.value as LangPreference));
+  onLangChange(render);
+}
+
+/** Re-translate everything on the phone page after a language change. */
+function refreshPhoneText(): void {
+  applyI18n(document);
+  paintStatusLabels();
+  if (lastEntries) renderContributions(lastEntries);
+  refreshRadiusLabel();
 }
 
 function initContribToggle(): void {
@@ -330,12 +369,21 @@ async function main(): Promise<void> {
     initContribToggle();
     initExternalLinks();
     initFeedbackForm();
-    setPhoneStatus('Connecting...');
+    initLanguagePicker();
+    applyI18n(document);
+    onLangChange(refreshPhoneText);
+    setPhoneStatus(() => t('p.connecting'));
+    setPhoneLocationStatus(() => t('p.waiting'), 'loading');
     setPhoneDot('connection-dot', 'loading');
     await initBridge();
 
-    setPhoneStatus('Connected');
+    setPhoneStatus(() => t('p.connected'));
     setPhoneDot('connection-dot', 'active');
+
+    // Prefer the Even app's own locale when it reports one (capped at ~1 s),
+    // so the very first glasses frame is already in the right language.
+    const deviceLocale = await detectDeviceLocale(getBridge());
+    console.log('[i18n] device locale:', deviceLocale ?? '(none)', '-> using', getLang());
 
     // Initialize glasses display immediately so something shows on-screen.
     // SDK requires createStartUpPageContainer called exactly once, before any rebuildPageContainer.
@@ -365,12 +413,19 @@ async function main(): Promise<void> {
     // Location now comes directly from the device, so load landmarks straight away.
     // If device location is denied/unavailable, getLocation() falls back to the
     // last cached fix or Prague, so this always proceeds.
+    // Language switch from Settings: redraw the glasses, and fetch the list
+    // again so descriptions come back in the new language.
+    onLangChange(() => {
+      if (state.mode === 'list' || state.mode === 'error') loadLandmarks().catch(() => {});
+      else rerenderCurrentView().catch(() => {});
+    });
+
     await loadLandmarks();
   } catch (error) {
-    const msg = error instanceof Error ? error.message : 'Unknown error';
+    const msg = error instanceof Error ? error.message : t('e.unknown');
     console.error('[app] main error:', msg, error);
-    setPhoneStatus(`Error: ${msg}`);
-    setPhoneDot('connection-dot', 'off');
+    setPhoneStatus(() => t('p.errorPrefix', { msg }));
+    setPhoneDot('connection-dot', 'error');
   }
 }
 

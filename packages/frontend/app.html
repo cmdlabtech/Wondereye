@@ -11,174 +11,168 @@
       background: #000;
       color: #fff;
       font-family: 'Even Roster Grotesk', system-ui, -apple-system, sans-serif;
-      font-size: 20px;
+      font-size: 15px;
       font-weight: 400;
       letter-spacing: 0;
-      padding: 24px 16px;
+      line-height: 1.3;
+      padding: 14px 12px 20px;
       min-height: 100vh;
     }
 
-    /* Brand header */
-    .brand {
-      margin-bottom: 24px;
-      padding-bottom: 20px;
-      border-bottom: 1px solid rgba(255,255,255,0.1);
-    }
-
-    .app-name {
-      font-size: 26px;
-      font-weight: 400;
-      letter-spacing: 0.02em;
-      text-align: center;
-    }
-
-    .brand-actions {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 12px;
-      margin-top: 14px;
-    }
-
-    .brand-action {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 5px;
-    }
-    .brand-action--end {
-      align-items: flex-end;
-      text-align: right;
-    }
-
-    .brand-action-url {
-      font-size: 12px;
-      opacity: 0.4;
-      letter-spacing: 0.01em;
-    }
-
+    /* Top bar: name left, Donate + map link right */
+    .topbar { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+    .app-name { font-size: 18px; letter-spacing: 0.02em; white-space: nowrap; }
     .brand-link {
-      font-size: 16px;
+      font-size: 13px;
       color: #4ade80;
       text-decoration: none;
+      white-space: nowrap;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
       -webkit-tap-highlight-color: transparent;
     }
     .brand-link:active { opacity: 0.6; }
-
     .donate-btn {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
-      padding: 9px 14px;
+      gap: 5px;
+      padding: 4px 10px;
       background: #FFDD00;
-      border-radius: 10px;
+      border-radius: 999px;
       text-decoration: none;
       color: #000;
+      white-space: nowrap;
       -webkit-tap-highlight-color: transparent;
-      transition: background 0.1s;
     }
     .donate-btn:active { background: #f2d200; }
-    .donate-icon { font-size: 18px; line-height: 1; }
-    .donate-text { font-size: 16px; font-weight: 600; letter-spacing: 0.01em; }
+    .donate-icon { font-size: 12px; line-height: 1; }
+    .donate-text { font-size: 13px; font-weight: 600; }
 
-    /* Status rows */
-    .status-row {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 14px 16px;
-      border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 6px;
-      margin-bottom: 8px;
+    /* Status icons in the top bar (glasses + location), dot shows state */
+    .status-icons { display: flex; align-items: center; gap: 8px; margin-right: auto; }
+    .status-icon {
+      position: relative;
+      display: inline-flex;
+      width: 22px; height: 22px;
+      color: rgba(255,255,255,0.7);
     }
+    .status-icon svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .status-icon .dot { position: absolute; right: -2px; bottom: -1px; box-shadow: 0 0 0 2px #000; }
 
     .dot {
-      width: 8px;
-      height: 8px;
+      width: 7px;
+      height: 7px;
       border-radius: 50%;
       background: #444;
       flex-shrink: 0;
     }
     .dot.active { background: #4ade80; }
     .dot.loading { background: #facc15; }
+    .dot.error { background: #ef4444; }
 
-    .row-labels { flex: 1; }
-    .row-label { font-size: 15px; opacity: 0.45; margin-bottom: 2px; }
-    .row-value { font-size: 20px; }
-
-    /* Settings */
-    .settings-heading {
-      font-size: 20px;
-      font-weight: 400;
-      opacity: 0.6;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      margin: 28px 0 16px;
-      padding-top: 24px;
-      border-top: 1px solid rgba(255,255,255,0.1);
-    }
-
+    /* Section label + card with rows */
     .section-label {
-      font-size: 16px;
+      font-size: 11px;
       opacity: 0.5;
-      margin-bottom: 8px;
-      padding-left: 4px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin: 16px 0 6px 2px;
     }
-
-    /* Search radius */
-    .radius-card {
-      border: 1px solid rgba(255,255,255,0.15);
+    .card {
+      border: 1px solid rgba(255,255,255,0.12);
       border-radius: 6px;
-      padding: 16px;
+      overflow: hidden;
     }
-    .radius-header {
+    .row {
       display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      margin-bottom: 14px;
+      align-items: center;
+      gap: 10px;
+      min-height: 44px;
+      padding: 6px 12px;
     }
-    .radius-title { font-size: 18px; }
-    .radius-value { font-size: 18px; opacity: 0.9; font-variant-numeric: tabular-nums; }
+    .row + .row, .row + .disclosure, .disclosure + .disclosure { border-top: 1px solid rgba(255,255,255,0.08); }
+    .row-label { flex-shrink: 0; }
+    .row-end { margin-left: auto; display: flex; align-items: center; min-width: 0; }
 
+    /* Language select */
+    .select-wrap { position: relative; margin-left: auto; min-width: 0; }
+    .select-wrap::after {
+      content: '\25BE';
+      position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+      font-size: 11px; opacity: 0.6; pointer-events: none;
+    }
+    .lang-select {
+      -webkit-appearance: none; appearance: none;
+      max-width: 100%;
+      padding: 5px 24px 5px 10px;
+      background: rgba(255,255,255,0.06);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 6px;
+      font: inherit;
+      font-size: 14px;
+      text-overflow: ellipsis;
+      outline: none;
+    }
+    .lang-select:focus { border-color: rgba(255,255,255,0.3); }
+    .lang-select option { background: #111; color: #fff; }
+
+    /* Range: slider inline with value */
     #radius-slider {
       -webkit-appearance: none;
       appearance: none;
-      width: 100%;
-      height: 4px;
-      border-radius: 2px;
-      background: rgba(255,255,255,0.18);
+      flex: 1;
+      min-width: 60px;
+      height: 28px;
+      background: transparent;
       outline: none;
     }
+    #radius-slider::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: rgba(255,255,255,0.18); }
+    #radius-slider::-moz-range-track { height: 4px; border-radius: 2px; background: rgba(255,255,255,0.18); }
     #radius-slider::-webkit-slider-thumb {
       -webkit-appearance: none;
       appearance: none;
-      width: 26px; height: 26px;
+      width: 20px; height: 20px;
+      margin-top: -8px;
       border-radius: 50%;
       background: #fff;
       cursor: pointer;
     }
     #radius-slider::-moz-range-thumb {
-      width: 26px; height: 26px;
+      width: 20px; height: 20px;
       border: none; border-radius: 50%;
       background: #fff; cursor: pointer;
     }
-    .radius-sub { font-size: 14px; opacity: 0.45; margin-top: 14px; line-height: 1.4; }
+    .radius-value {
+      flex-shrink: 0;
+      min-width: 52px;
+      text-align: right;
+      font-size: 14px;
+      opacity: 0.9;
+      font-variant-numeric: tabular-nums;
+    }
 
-    /* Toggle groups (units, device location) */
-    .toggle-group { display: flex; gap: 8px; }
-    .toggle-btn {
-      flex: 1;
-      padding: 12px 16px;
+    /* Segmented control (units, feedback category) */
+    .segmented {
+      display: inline-flex;
+      padding: 2px;
+      gap: 2px;
       background: rgba(255,255,255,0.06);
-      color: rgba(255,255,255,0.5);
       border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 6px;
-      font-size: 17px;
-      font-family: inherit;
+      border-radius: 7px;
+    }
+    .toggle-btn {
+      padding: 4px 12px;
+      background: transparent;
+      color: rgba(255,255,255,0.5);
+      border: 1px solid transparent;
+      border-radius: 5px;
+      font: inherit;
+      font-size: 13px;
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
-      text-align: center;
+      white-space: nowrap;
       transition: background 0.15s, color 0.15s, border-color 0.15s;
     }
     .toggle-btn.active {
@@ -188,18 +182,38 @@
     }
     .toggle-btn:active { background: rgba(255,255,255,0.2); }
 
-    /* My Map Contributions */
-    .contrib {
-      border: 1px solid rgba(255,255,255,0.15);
-      border-radius: 6px;
-      overflow: hidden;
+    /* On/off switch */
+    .switch {
+      position: relative;
+      flex-shrink: 0;
+      margin-left: auto;
+      width: 42px; height: 24px;
+      border: none;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.18);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.15s;
     }
+    .switch::after {
+      content: '';
+      position: absolute; top: 3px; left: 3px;
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: #fff;
+      transition: transform 0.15s;
+    }
+    .switch[aria-checked="true"] { background: #4ade80; }
+    .switch[aria-checked="true"]::after { transform: translateX(18px); }
+
+    /* Collapsed one-line disclosures (contributions, feedback) */
     .contrib-toggle {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
       width: 100%;
-      padding: 14px 16px;
+      min-height: 44px;
+      padding: 6px 12px;
       background: transparent;
       border: none;
       color: #fff;
@@ -209,146 +223,145 @@
       -webkit-tap-highlight-color: transparent;
     }
     .contrib-toggle:active { background: rgba(255,255,255,0.06); }
-    .contrib-summary { flex: 1; }
-    .contrib-chevron { font-size: 14px; opacity: 0.6; transition: transform 0.15s; }
+    .contrib-summary { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .contrib-count {
+      font-size: 12px; opacity: 0.6;
+      background: rgba(255,255,255,0.08);
+      border-radius: 999px; padding: 1px 8px;
+      font-variant-numeric: tabular-nums;
+    }
+    .contrib-chevron { font-size: 11px; opacity: 0.6; transition: transform 0.15s; }
     .contrib-toggle[aria-expanded="true"] .contrib-chevron { transform: rotate(180deg); }
 
-    .contrib-list { border-top: 1px solid rgba(255,255,255,0.08); }
+    .contrib-list { border-top: 1px solid rgba(255,255,255,0.08); max-height: 240px; overflow-y: auto; }
     .contrib-item {
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 12px 16px;
+      padding: 8px 12px;
       border-bottom: 1px solid rgba(255,255,255,0.06);
     }
     .contrib-item:last-child { border-bottom: none; }
     .contrib-name {
-      flex: 1; font-size: 17px;
+      flex: 1; font-size: 14px;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .contrib-type {
-      font-size: 12px; opacity: 0.45;
+      font-size: 11px; opacity: 0.45;
       background: rgba(255,255,255,0.08);
-      border-radius: 4px; padding: 2px 6px;
+      border-radius: 4px; padding: 1px 6px;
       white-space: nowrap; flex-shrink: 0;
     }
-    .contrib-date { font-size: 13px; opacity: 0.35; flex-shrink: 0; }
-    .contrib-empty { padding: 14px 16px; font-size: 15px; opacity: 0.45; line-height: 1.4; }
-    /* Send feedback (reuses .contrib / .toggle-btn / .radius-sub) */
-    .feedback-form { border-top: 1px solid rgba(255,255,255,0.08); padding: 14px 16px 16px; }
+    .contrib-date { font-size: 12px; opacity: 0.35; flex-shrink: 0; }
+    .contrib-empty { padding: 10px 12px; font-size: 13px; opacity: 0.45; line-height: 1.4; }
+
+    /* Feedback form */
+    .feedback-form { border-top: 1px solid rgba(255,255,255,0.08); padding: 10px 12px 12px; }
+    .feedback-form .segmented { display: flex; }
+    .feedback-form .segmented .toggle-btn { flex: 1; }
     .feedback-field {
       width: 100%;
-      margin-top: 10px;
-      padding: 12px 14px;
+      margin-top: 8px;
+      padding: 8px 10px;
       background: rgba(255,255,255,0.06);
       color: #fff;
       border: 1px solid rgba(255,255,255,0.12);
       border-radius: 6px;
       font: inherit;
-      font-size: 17px;
+      font-size: 14px;
       outline: none;
     }
     .feedback-field:focus { border-color: rgba(255,255,255,0.3); }
     textarea.feedback-field { resize: none; line-height: 1.4; }
     .feedback-honeypot { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+    .hint { font-size: 12px; opacity: 0.45; margin-top: 8px; line-height: 1.4; }
     .feedback-meta { display: flex; justify-content: space-between; gap: 12px; }
-    #feedback-count { white-space: nowrap; }
+    #feedback-count { white-space: nowrap; font-variant-numeric: tabular-nums; }
     .feedback-form [hidden] { display: none; }
-    #feedback-turnstile { margin-top: 12px; min-height: 65px; }
-    #feedback-submit { width: 100%; margin-top: 12px; }
+    #feedback-turnstile { margin-top: 8px; min-height: 65px; }
+    #feedback-submit { display: block; width: 100%; margin-top: 8px; padding: 7px 12px; border-color: rgba(255,255,255,0.3); }
     #feedback-submit:disabled { opacity: 0.4; }
   </style>
 </head>
 <body>
-  <div class="brand">
+  <header class="topbar">
     <div class="app-name">Wondereye</div>
-    <div class="brand-actions">
-      <div class="brand-action">
-        <a class="donate-btn" href="https://www.paypal.com/donate/?hosted_button_id=Z5SDZULELYGNS" target="_blank" rel="noopener noreferrer" data-external>
-          <span class="donate-icon">&#10084;</span>
-          <span class="donate-text">Donate</span>
-        </a>
-        <span class="brand-action-url">wondereye.app/support</span>
-      </div>
-      <div class="brand-action brand-action--end">
-        <a class="brand-link" href="https://wondereye.app/map" target="_blank" rel="noopener noreferrer" data-external>View the map &rarr;</a>
-        <span class="brand-action-url">wondereye.app/map</span>
-      </div>
+    <div class="status-icons">
+      <span class="status-icon" id="glasses-status" role="img" aria-label="Glasses" title="Glasses">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6.5" cy="14" r="3.5"/><circle cx="17.5" cy="14" r="3.5"/><path d="M10 14h4M3 14V9.5L5 6M21 14V9.5L19 6"/></svg>
+        <span class="dot loading" id="connection-dot"></span>
+      </span>
+      <span class="status-icon" id="location-status-icon" role="img" aria-label="Location" title="Location">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></svg>
+        <span class="dot loading" id="location-dot"></span>
+      </span>
     </div>
-  </div>
+    <a class="brand-link" href="https://wondereye.app/map" target="_blank" rel="noopener noreferrer" data-external data-i18n="p.viewMap" title="wondereye.app/map">View the map &rarr;</a>
+    <a class="donate-btn" href="https://www.paypal.com/donate/?hosted_button_id=Z5SDZULELYGNS" target="_blank" rel="noopener noreferrer" data-external title="wondereye.app/support">
+      <span class="donate-icon">&#10084;</span>
+      <span class="donate-text" data-i18n="p.donate">Donate</span>
+    </a>
+  </header>
 
-  <div class="status-row">
-    <div class="dot loading" id="connection-dot"></div>
-    <div class="row-labels">
-      <div class="row-label">Glasses</div>
-      <div class="row-value" id="connection-status">Connecting...</div>
+  <h2 class="section-label" data-i18n="p.settings">Settings</h2>
+  <div class="card">
+    <div class="row">
+      <label class="row-label" for="lang-select" data-i18n="p.language">Language</label>
+      <span class="select-wrap"><select class="lang-select" id="lang-select"></select></span>
     </div>
-  </div>
-
-  <div class="status-row">
-    <div class="dot" id="location-dot"></div>
-    <div class="row-labels">
-      <div class="row-label">Location</div>
-      <div class="row-value" id="location-status">Waiting...</div>
-    </div>
-  </div>
-
-  <h2 class="settings-heading">Settings</h2>
-
-  <p class="section-label">Search Radius</p>
-  <div class="radius-card">
-    <div class="radius-header">
-      <span class="radius-title">Nearby range</span>
+    <div class="row">
+      <label class="row-label" for="radius-slider" data-i18n="p.range">Range</label>
+      <input type="range" id="radius-slider" min="250" max="2000" step="250" value="2000" />
       <span class="radius-value" id="radius-value">2.0 km</span>
     </div>
-    <input type="range" id="radius-slider" min="250" max="2000" step="250" value="2000" />
-    <div class="radius-sub">How far around you to look for landmarks. Smaller ranges load faster in dense areas.</div>
-  </div>
-
-  <p class="section-label" style="margin-top:24px">Units</p>
-  <div class="toggle-group">
-    <button class="toggle-btn" id="units-imperial">Imperial</button>
-    <button class="toggle-btn" id="units-metric">Metric</button>
-  </div>
-
-  <p class="section-label" style="margin-top:24px">Device Location</p>
-  <div class="toggle-group">
-    <button class="toggle-btn" id="geo-on">On</button>
-    <button class="toggle-btn" id="geo-off">Off</button>
-  </div>
-
-  <p class="section-label" style="margin-top:32px">My Map Contributions</p>
-  <div class="contrib">
-    <button class="contrib-toggle" id="contrib-toggle" aria-expanded="false">
-      <span class="contrib-summary" id="contrib-summary">No contributions yet</span>
-      <span class="contrib-chevron">&#9662;</span>
-    </button>
-    <div class="contrib-list" id="contrib-list" hidden></div>
-  </div>
-
-  <p class="section-label" style="margin-top:32px">Feedback</p>
-  <div class="contrib">
-    <button class="contrib-toggle" id="feedback-toggle" aria-expanded="false" aria-controls="feedback-form">
-      <span class="contrib-summary">Send feedback</span>
-      <span class="contrib-chevron">&#9662;</span>
-    </button>
-    <form class="feedback-form" id="feedback-form" hidden novalidate>
-      <div class="toggle-group" role="radiogroup" aria-label="Category">
-        <button type="button" class="toggle-btn active" data-category="bug">Bug</button>
-        <button type="button" class="toggle-btn" data-category="idea">Idea</button>
-        <button type="button" class="toggle-btn" data-category="other">Other</button>
+    <div class="row">
+      <span class="row-label" id="units-label" data-i18n="p.units">Units</span>
+      <div class="row-end">
+        <div class="segmented" role="group" aria-labelledby="units-label">
+          <button class="toggle-btn" id="units-imperial" data-i18n-aria="p.imperial" aria-label="Imperial">mi</button>
+          <button class="toggle-btn" id="units-metric" data-i18n-aria="p.metric" aria-label="Metric">km</button>
+        </div>
       </div>
-      <input class="feedback-field" id="feedback-title" type="text" maxlength="80" placeholder="Title (optional)" aria-label="Title (optional)" autocomplete="off" />
-      <textarea class="feedback-field" id="feedback-message" rows="4" maxlength="2000" placeholder="What happened, or what would you like to see?" aria-label="Message" required></textarea>
-      <input class="feedback-honeypot" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" />
-      <div class="feedback-meta radius-sub">
-        <span>Posted publicly on GitHub. Please leave out personal details.</span>
-        <span id="feedback-count">0 / 2000</span>
-      </div>
-      <div id="feedback-turnstile"></div>
-      <button type="submit" class="toggle-btn active" id="feedback-submit" disabled>Send</button>
-      <p class="radius-sub" id="feedback-status" role="status" aria-live="polite"></p>
-    </form>
+    </div>
+    <div class="row">
+      <span class="row-label" id="geo-label" data-i18n="p.deviceLocation">Device Location</span>
+      <button class="switch" id="geo-switch" role="switch" aria-checked="true" aria-labelledby="geo-label"></button>
+    </div>
+  </div>
+
+  <h2 class="section-label" data-i18n="p.more">More</h2>
+  <div class="card">
+    <div class="disclosure">
+      <button class="contrib-toggle" id="contrib-toggle" aria-expanded="false" aria-controls="contrib-list">
+        <span class="contrib-summary" data-i18n="p.contrib">My Map Contributions</span>
+        <span class="contrib-count" id="contrib-summary">0</span>
+        <span class="contrib-chevron">&#9662;</span>
+      </button>
+      <div class="contrib-list" id="contrib-list" hidden></div>
+    </div>
+    <div class="disclosure">
+      <button class="contrib-toggle" id="feedback-toggle" aria-expanded="false" aria-controls="feedback-form">
+        <span class="contrib-summary" data-i18n="p.sendFeedback">Send feedback</span>
+        <span class="contrib-chevron">&#9662;</span>
+      </button>
+      <form class="feedback-form" id="feedback-form" hidden novalidate>
+        <div class="segmented" role="radiogroup" aria-label="Category">
+          <button type="button" class="toggle-btn active" data-category="bug" data-i18n="p.bug">Bug</button>
+          <button type="button" class="toggle-btn" data-category="idea" data-i18n="p.idea">Idea</button>
+          <button type="button" class="toggle-btn" data-category="other" data-i18n="p.other">Other</button>
+        </div>
+        <input class="feedback-field" id="feedback-title" type="text" maxlength="80" placeholder="Title (optional)" aria-label="Title (optional)" data-i18n-placeholder="p.titleOpt" data-i18n-aria="p.titleOpt" autocomplete="off" />
+        <textarea class="feedback-field" id="feedback-message" rows="3" maxlength="2000" placeholder="What happened, or what would you like to see?" aria-label="Message" data-i18n-placeholder="p.messagePh" data-i18n-aria="p.message" required></textarea>
+        <input class="feedback-honeypot" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" />
+        <div class="feedback-meta hint">
+          <span data-i18n="p.publicNote">Posted publicly on GitHub. Please leave out personal details.</span>
+          <span id="feedback-count">0 / 2000</span>
+        </div>
+        <div id="feedback-turnstile"></div>
+        <button type="submit" class="toggle-btn active" id="feedback-submit" disabled data-i18n="p.send">Send</button>
+        <p class="hint" id="feedback-status" role="status" aria-live="polite"></p>
+      </form>
+    </div>
   </div>
 
   <script type="module" src="/src/main.ts"></script>

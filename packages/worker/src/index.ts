@@ -4,6 +4,7 @@ import { findNearbyPOIs } from './places';
 import { cleanSnippet, generateDetail, generateSnippets, GROK_MATCH_MODEL } from './grok';
 import { Bindings, LandmarkDetailInput, LandmarkResponse } from './types';
 import { handleFeedback } from './feedback';
+import { areaCacheKey, detailCacheKey, parseLang, slugify } from './lang';
 
 const MAX_RADIUS = 2000;
 const MIN_RADIUS = 50;
@@ -11,33 +12,6 @@ const CACHE_TTL = 7776000; // 90 days
 const DETAIL_CACHE_TTL = 7776000; // 90 days
 const PLACE_TTL = 7776000; // 90 days — short-term accumulator
 const MAP_CACHE_TTL = 3600; // 1 hour — aggregated /api/map response; expires naturally (writes no longer bust it)
-const CACHE_GEN = 'v6'; // bump when snippet/detail generation changes so stale KV copy is skipped
-
-function cacheKey(lat: number, lng: number, radius: number): string {
-  return `landmarks:${CACHE_GEN}:${lat.toFixed(3)}:${lng.toFixed(3)}:${radius}`;
-}
-
-function detailCacheKey(name: string, unitSystem: string, lat?: number, lng?: number): string {
-  const slug = slugify(name);
-  if (typeof lat === 'number' && typeof lng === 'number') {
-    return `detail:${CACHE_GEN}:${slug}:${lat.toFixed(3)}:${lng.toFixed(3)}:${unitSystem}`;
-  }
-  return `detail:${CACHE_GEN}:${slug}:${unitSystem}`;
-}
-
-// Non-Latin names (e.g. CJK) have no a-z0-9 characters, so the ASCII slug
-// collapses to empty and distinct names would otherwise collide on the same
-// key. Fall back to a short deterministic hash of the full name in that case.
-function slugify(name: string): string {
-  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 100);
-  if (slug) return slug;
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = (hash * 31 + name.charCodeAt(i)) | 0;
-  }
-  return `n${(hash >>> 0).toString(36)}`;
-}
-
 function optionalCoord(value: unknown, min: number, max: number): number | undefined {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < min || value > max) return undefined;
   return value;
@@ -148,6 +122,10 @@ app.post('/api/landmarks', async (c) => {
 
   const { lat, lng } = body;
   let radius = body.radius ?? 500;
+  // Optional output language (whitelisted, default English). Only English
+  // text is ever written to the public map (place:/mapplace: records).
+  const lang = parseLang(body.lang);
+  const writesMap = lang === 'en';
 
   if (typeof lat !== 'number' || typeof lng !== 'number') {
     return c.json({ error: 'lat and lng are required numbers' }, 400);
@@ -165,12 +143,12 @@ app.post('/api/landmarks', async (c) => {
   const safeLat = Math.round(lat * 1000) / 1000;
   const safeLng = Math.round(lng * 1000) / 1000;
 
-  const key = cacheKey(safeLat, safeLng, radius);
+  const key = areaCacheKey(safeLat, safeLng, radius, lang);
 
   const cached = await c.env.LANDMARKS_CACHE.get(key, 'json');
   if (cached) {
     const response = cached as LandmarkResponse;
-    if (response.landmarks.length > 0) {
+    if (writesMap && response.landmarks.length > 0) {
       if (response.landmarks[0].lat == null) {
         // Old cached data without coordinates — backfill via the POI lookup
         c.executionCtx.waitUntil(
@@ -225,7 +203,7 @@ app.post('/api/landmarks', async (c) => {
   }
 
   try {
-    const landmarks = await generateSnippets(pois, c.env.XAI_API_KEY, { lat: safeLat, lng: safeLng });
+    const landmarks = await generateSnippets(pois, c.env.XAI_API_KEY, { lat: safeLat, lng: safeLng }, lang);
     const response: LandmarkResponse = { landmarks };
     if (landmarks.length === 0) {
       return c.json(response);
@@ -233,7 +211,7 @@ app.post('/api/landmarks', async (c) => {
     c.executionCtx.waitUntil(
       Promise.all([
         c.env.LANDMARKS_CACHE.put(key, JSON.stringify(response), { expirationTtl: CACHE_TTL }),
-        ...landmarks.flatMap(lm => {
+        ...(writesMap ? landmarks : []).flatMap(lm => {
           const place = { name: lm.name, type: lm.type, lat: lm.lat, lng: lm.lng, snippet: lm.snippet };
           return [
             c.env.LANDMARKS_CACHE.put(placeKey(lm.name), JSON.stringify(place), { expirationTtl: PLACE_TTL }),
@@ -271,7 +249,8 @@ app.post('/api/landmark-detail', async (c) => {
   const lat = optionalCoord(body.lat, -90, 90);
   const lng = optionalCoord(body.lng, -180, 180);
 
-  const detailKey = detailCacheKey(name, unitSystem, lat, lng);
+  const lang = parseLang(body.lang);
+  const detailKey = detailCacheKey(name, unitSystem, lat, lng, lang);
   const cachedDetail = await c.env.LANDMARKS_CACHE.get(detailKey, 'json');
   if (cachedDetail) {
     return c.json(cachedDetail);
@@ -294,7 +273,7 @@ app.post('/api/landmark-detail', async (c) => {
   };
 
   try {
-    const text = await generateDetail(input, c.env.XAI_API_KEY);
+    const text = await generateDetail(input, c.env.XAI_API_KEY, lang);
     if (text) {
       c.executionCtx.waitUntil(
         c.env.LANDMARKS_CACHE.put(detailKey, JSON.stringify({ detail: text }), {
