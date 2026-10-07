@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.6.6 - Unreleased
+## v1.7.0 - 2026-10-07
 
 ### Languages
 - Wondereye is now available in English, German, French, Spanish, Italian, Simplified Chinese, Japanese, and Korean. The glasses display, the phone settings page, the feedback form, and error messages are shown in your language.
@@ -20,6 +20,7 @@
 
 ### Platform
 - The network allowlist now includes Cloudflare Turnstile (`challenges.cloudflare.com`), which is required for feedback verification.
+- Wondereye 1.7.0 requires Even Realities App 2.2.9 or later.
 
 ## v1.6.5 - 2026-09-26
 
