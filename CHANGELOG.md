@@ -7,7 +7,7 @@
 - Landmark searches complete within about 8 seconds in the worst case, and the app stops waiting after 30 seconds.
 - When a lookup cannot be completed, the glasses show a clear message with guidance, for example "Landmark service is busy. Tap to retry in a moment.", instead of a technical error code.
 - The phone screen shows your coordinates as soon as your location is found and indicates when a landmark lookup has failed, rather than remaining on "Getting location...".
-- Landmark descriptions are based on Wikipedia article summaries and OpenStreetMap details where available, which reduces inaccurate dates, figures, and names. Descriptions are presented as two concise sentences.
+- Landmark descriptions are written by Grok. Wikipedia is used only to find nearby places, and no Wikipedia text is used in descriptions. Descriptions are two or three concise sentences, and details that cannot be confirmed, such as uncertain dates, figures, or names, are left out.
 
 ### Glasses experience
 - Opening and closing the system menu no longer pauses the compass or cancels a voice search in progress.
