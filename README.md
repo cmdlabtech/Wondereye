@@ -44,6 +44,7 @@ Open Wondereye's settings from the Even Hub app to:
 - Choose **imperial or metric** units
 - Toggle **device location** on/off
 - View **My Map Contributions** — the landmarks you've discovered
+- **Send feedback** (bug, idea, or other) — posted publicly as a GitHub issue; no email or account
 - **Support the project**
 
 ## Privacy
@@ -98,6 +99,17 @@ npx evenhub-simulator "http://localhost:5173/app.html?lat=48.8566&lng=2.3522"
 ```
 
 Pass any `lat`/`lng` query params to simulate a location.
+
+### Feedback endpoint
+
+`POST /api/feedback` files filtered feedback as GitHub issues. It is off unless
+`FEEDBACK_ENABLED=true` and needs two Worker secrets (`TURNSTILE_SECRET`,
+`GITHUB_FEEDBACK_TOKEN`). See [`docs/feedback.md`](docs/feedback.md) for the
+abuse defenses, every binding, and local preview steps.
+
+```bash
+cd packages/worker && npm test   # vitest: validation, rate limit, Turnstile, dedupe
+```
 
 ### Packaging for the Even App Store
 

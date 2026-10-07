@@ -5,6 +5,7 @@ import { formatType, landmarkId, TYPE_GROUPS, type Landmark, type TypeGroup } fr
 import { Wordmark } from "@/components/wordmark";
 import { PinCard } from "@/components/pin-card";
 import { PlacesPanel } from "@/components/places-panel";
+import { FeedbackButton } from "@/components/feedback-button";
 import { cn } from "@/lib/cn";
 import { useCloseMap, useGlobeSession } from "@/lib/globe-session";
 
@@ -424,9 +425,18 @@ export function GlobeView() {
         ) : null}
       </div>
 
-      <p className={cn("map-chrome-enter pointer-events-none fixed bottom-3 left-3 hidden px-2 py-1 text-xs text-muted md:block", chromeZ)}>
-        Drag to orbit · scroll to zoom · browse the list
-      </p>
+      <div
+        className={cn(
+          "map-chrome-enter pointer-events-none fixed bottom-[4.9rem] left-3 flex items-end gap-2 md:bottom-3",
+          panelOpen && "max-md:hidden",
+          chromeZ,
+        )}
+      >
+        <FeedbackButton />
+        <p className="hidden px-2 py-1 text-xs text-muted md:block">
+          Drag to orbit · scroll to zoom · browse the list
+        </p>
+      </div>
     </div>
   );
 }

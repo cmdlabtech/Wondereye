@@ -1,6 +1,8 @@
 import { defineConfig, loadEnv, type Plugin, type ResolvedConfig } from 'vite';
 import { resolve } from 'path';
-import { rmSync } from 'fs';
+import { readFileSync, rmSync } from 'fs';
+
+const appVersion: string = JSON.parse(readFileSync(resolve(__dirname, 'app.json'), 'utf8')).version;
 
 // Load .env.local for dev IP configuration
 // process.env.VITE_DEV_IP takes precedence (allows script overrides), then .env.local, then localhost
@@ -46,6 +48,7 @@ export default defineConfig(({ mode }) => {
   return {
     root: '.',
     publicDir: 'public',
+    define: { __APP_VERSION__: JSON.stringify(appVersion) },
     plugins: [stripInternalFiles(isEhpk)],
     server: {
       host: devHost,

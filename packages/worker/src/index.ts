@@ -3,6 +3,7 @@ import { cors } from 'hono/cors';
 import { findNearbyPOIs } from './places';
 import { cleanSnippet, generateDetail, generateSnippets, GROK_MATCH_MODEL } from './grok';
 import { Bindings, LandmarkDetailInput, LandmarkResponse } from './types';
+import { handleFeedback } from './feedback';
 
 const MAX_RADIUS = 2000;
 const MIN_RADIUS = 50;
@@ -477,6 +478,8 @@ app.get('/api/map', async (c) => {
   );
   return c.json(response);
 });
+
+app.post('/api/feedback', handleFeedback);
 
 app.get('/health', (c) => c.json({ status: 'ok' }));
 

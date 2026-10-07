@@ -12,6 +12,7 @@ import { reverseGeocode } from './geocode';
 import { getUnits, setUnits } from './units';
 import { getRadius, setRadius, RADIUS_MIN, RADIUS_MAX } from './radius';
 import { getGeoEnabled, setGeoEnabled } from './geo-settings';
+import { initFeedbackForm } from './feedback';
 
 const state: AppState = {
   landmarks: [],
@@ -328,6 +329,7 @@ async function main(): Promise<void> {
     initGeoToggle();
     initContribToggle();
     initExternalLinks();
+    initFeedbackForm();
     setPhoneStatus('Connecting...');
     setPhoneDot('connection-dot', 'loading');
     await initBridge();
