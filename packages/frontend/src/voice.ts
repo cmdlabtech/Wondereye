@@ -1,3 +1,4 @@
+import { AudioInputSource } from '@evenrealities/even_hub_sdk';
 import { getBridge } from './bridge';
 import { AppState } from './types';
 import { fetchTranscribe, fetchLandmarkDetail } from './api';
@@ -116,7 +117,8 @@ export function startVoiceRecording(state: AppState): void {
   state.mode = 'listening';
   state.voiceBuffer = [];
   state.voiceSilenceAccum = 0;
-  getBridge().audioControl(true).catch((err: unknown) => {
+  // Explicit glasses source: matches the declared g2-microphone permission.
+  getBridge().audioControl(true, AudioInputSource.Glasses).catch((err: unknown) => {
     console.warn('[voice] audioControl(true) failed:', err);
   });
   renderListening().catch((err: unknown) => console.warn('[voice] renderListening failed:', err));

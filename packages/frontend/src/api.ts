@@ -13,15 +13,54 @@ function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+// Upper bound for the landmark lookup. The worker itself gives up on
+// upstream data sources well before this; the client ceiling just makes sure
+// a stalled connection can never leave the app "loading" forever.
+const LANDMARKS_TIMEOUT_MS = 30_000;
+
+/** Error from the landmark API, carrying a message fit for the glasses HUD. */
+export class LandmarkApiError extends Error {
+  constructor(message: string, readonly status?: number) {
+    super(message);
+    this.name = 'LandmarkApiError';
+  }
+}
+
+function friendlyApiError(status: number): LandmarkApiError {
+  if (status === 429) {
+    return new LandmarkApiError('Too many requests.\nWait a minute, then tap to retry.', status);
+  }
+  if (status >= 500) {
+    return new LandmarkApiError('Landmark service is busy.\nTap to retry in a moment.', status);
+  }
+  return new LandmarkApiError(`Could not load landmarks (${status}).\nTap to retry.`, status);
+}
+
 export async function fetchLandmarks(lat: number, lng: number): Promise<Landmark[]> {
-  const response = await fetch(`${API_BASE_URL}/api/landmarks`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ lat, lng, radius: getRadius() }),
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), LANDMARKS_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}/api/landmarks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lat, lng, radius: getRadius() }),
+      signal: controller.signal,
+    });
+  } catch (e) {
+    const aborted = (e as { name?: string })?.name === 'AbortError';
+    throw new LandmarkApiError(
+      aborted
+        ? 'Landmark lookup timed out.\nTap to retry.'
+        : 'No connection to Wondereye.\nCheck your phone, then tap to retry.',
+    );
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (!response.ok) {
-    throw new Error(`API error: ${response.status}`);
+    console.warn('[api] /api/landmarks returned', response.status);
+    throw friendlyApiError(response.status);
   }
 
   const data = await response.json();
