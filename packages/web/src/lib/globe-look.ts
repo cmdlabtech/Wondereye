@@ -1,7 +1,8 @@
 import * as THREE from "three";
 
-/** Tight silver shell just outside the earth, for a paperweight limb. */
-export const ATMOSPHERE_SCALE = 1.016;
+/** Soft sky shell just outside the earth. */
+export const ATMOSPHERE_SCALE = 1.028;
+export const SCENE_BG = 0xe7eef6;
 
 const EARTH_VERT = /* glsl */ `
 varying vec3 vNormal;
@@ -29,36 +30,21 @@ void main() {
   vec3 n = normalize(vNormal);
   vec3 v = normalize(cameraPosition - vWorld);
   vec3 l = normalize(lightDir);
-  vec3 c = texture2D(map, vUv).rgb;
-  vec3 cSoft = texture2D(map, vUv, 1.4).rgb;
-
-  float luma = dot(cSoft, vec3(0.2126, 0.7152, 0.0722));
-  float blue = c.b - max(c.r, c.g) * 0.62;
-  float water = smoothstep(0.04, 0.15, blue);
-  water *= 1.0 - smoothstep(0.76, 0.92, luma);
-  float ice = smoothstep(0.76, 0.93, luma) * (1.0 - water);
-
-  float landL = smoothstep(0.14, 0.56, luma);
-  vec3 land = mix(vec3(0.12), vec3(0.52), landL);
-  vec3 ocean = vec3(0.016);
-  vec3 iceC = vec3(0.84);
-  vec3 albedo = mix(land, ocean, water);
-  albedo = mix(albedo, iceC, ice);
-
-  float coast = 1.0 - smoothstep(0.0, 0.18, abs(water - 0.5) * 2.0);
-  albedo = mix(albedo, vec3(0.36), coast * 0.16 * (1.0 - ice));
+  vec3 albedo = texture2D(map, vUv).rgb;
+  albedo = pow(albedo, vec3(0.96));
 
   float ndl = dot(n, l);
-  float wrap = clamp(ndl * 0.62 + 0.38, 0.22, 1.0);
+  float wrap = clamp(ndl * 0.58 + 0.46, 0.38, 1.0);
   vec3 h = normalize(l + v);
-  float spec = pow(max(dot(n, h), 0.0), mix(22.0, 110.0, water));
-  spec *= mix(0.04, 0.18, water) * step(0.0, ndl);
-  float fres = pow(1.0 - max(dot(n, v), 0.0), 3.6);
+  float water = smoothstep(0.02, 0.14, albedo.b - max(albedo.r, albedo.g) * 0.55);
+  float spec = pow(max(dot(n, h), 0.0), mix(36.0, 72.0, water));
+  spec *= mix(0.035, 0.22, water) * step(0.0, ndl);
+  float fres = pow(1.0 - max(dot(n, v), 0.0), 3.4);
 
   vec3 col = albedo * wrap;
-  col += vec3(spec);
-  col += vec3(0.82) * fres * 0.16;
-  col += albedo * 0.07;
+  col += vec3(0.85, 0.92, 1.0) * spec;
+  col += vec3(0.42, 0.64, 0.95) * fres * mix(0.1, 0.22, water);
+  col += albedo * 0.04;
   col += (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) / 255.0;
 
   gl_FragColor = vec4(col, 1.0);
@@ -85,9 +71,9 @@ varying vec3 vWorld;
 void main() {
   vec3 n = normalize(vNormal);
   vec3 v = normalize(cameraPosition - vWorld);
-  float fres = pow(1.0 - abs(dot(n, v)), 6.2);
-  float alpha = fres * 0.5 * intensity;
-  gl_FragColor = vec4(vec3(0.92), alpha);
+  float fres = pow(1.0 - abs(dot(n, v)), 3.6);
+  float alpha = fres * 0.7 * intensity;
+  gl_FragColor = vec4(vec3(0.42, 0.66, 0.98), alpha);
 }
 `;
 
@@ -111,7 +97,7 @@ export function createAtmosphereMesh(radius: number): THREE.Mesh {
     side: THREE.BackSide,
     transparent: true,
     depthWrite: false,
-    blending: THREE.AdditiveBlending,
+    blending: THREE.NormalBlending,
     toneMapped: false,
   });
   const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius * ATMOSPHERE_SCALE, 80, 48), mat);
@@ -129,5 +115,5 @@ export function studioLightDir(
   right.setFromMatrixColumn(camera.matrixWorld, 0);
   camUp.setFromMatrixColumn(camera.matrixWorld, 1);
   out.setFromMatrixColumn(camera.matrixWorld, 2);
-  return out.addScaledVector(camUp, 0.38).addScaledVector(right, -0.46).normalize();
+  return out.addScaledVector(camUp, 0.42).addScaledVector(right, -0.38).normalize();
 }

@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, Pause, Play, Search } from "lucide-react";
+import { List, Loader2, Pause, Play, Search, Shuffle } from "lucide-react";
 import { FLY_LANDMARK_DIST, FLY_PLACE_DIST, type MarkerPick } from "@/lib/globe-types";
-import { formatType, type Landmark } from "@/lib/landmarks";
+import { formatType, landmarkId, TYPE_GROUPS, type Landmark, type TypeGroup } from "@/lib/landmarks";
 import { Wordmark } from "@/components/wordmark";
 import { PinCard } from "@/components/pin-card";
+import { PlacesPanel } from "@/components/places-panel";
 import { cn } from "@/lib/cn";
 import { useCloseMap, useGlobeSession } from "@/lib/globe-session";
 
@@ -12,6 +13,8 @@ export function GlobeView() {
   const landmarks = useGlobeSession((s) => s.landmarks);
   const ready = useGlobeSession((s) => s.ready);
   const opening = useGlobeSession((s) => s.mode === "opening");
+  const pending = useGlobeSession((s) => s.pendingLandmark);
+  const setPending = useGlobeSession((s) => s.setPendingLandmark);
   const chromeZ = opening ? "z-20" : "z-30";
   const closeMap = useCloseMap();
   const popupRef = useRef<HTMLDivElement>(null);
@@ -19,6 +22,8 @@ export function GlobeView() {
   const resultsRef = useRef<HTMLDivElement>(null);
   const pickRef = useRef<MarkerPick | null>(null);
   const hoverRef = useRef<MarkerPick | null>(null);
+  const visKeyRef = useRef("");
+  const visAtRef = useRef(0);
 
   const [query, setQuery] = useState("");
   const [activeIdx, setActiveIdx] = useState(-1);
@@ -26,9 +31,29 @@ export function GlobeView() {
   const [pick, setPick] = useState<MarkerPick | null>(null);
   const [hover, setHover] = useState<MarkerPick | null>(null);
   const [spinning, setSpinning] = useState(true);
+  const [group, setGroup] = useState<TypeGroup>(TYPE_GROUPS[0]);
+  const [visible, setVisible] = useState<Landmark[]>([]);
+  const [panelOpen, setPanelOpen] = useState(() =>
+    typeof window === "undefined" ? true : window.innerWidth >= 768,
+  );
 
   pickRef.current = pick;
   hoverRef.current = hover;
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return landmarks.filter((m) => {
+      if (group.types && !group.types.includes(m.type)) return false;
+      if (q && !m.name.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [landmarks, query, group]);
+
+  const matches = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    return filtered.slice(0, 6);
+  }, [filtered, query]);
 
   useEffect(() => {
     const g = globe;
@@ -40,11 +65,27 @@ export function GlobeView() {
     }
   }, [pick, globe]);
 
-  const matches = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return [];
-    return landmarks.filter((m) => m.name.toLowerCase().includes(q)).slice(0, 6);
-  }, [landmarks, query]);
+  useEffect(() => {
+    globe?.setTypeFilter(group.types);
+  }, [globe, group]);
+
+  const flyToLandmark = (lm: Landmark) => {
+    setOpenResults(false);
+    setPick({ kind: "pin", lat: lm.lat, lng: lm.lng, landmark: lm });
+    const g = globe;
+    if (!g) return;
+    g.suppressPicks(700);
+    g.setFocus(lm);
+    setSpinning(false);
+    void g.flyTo(lm.lat, lm.lng, FLY_LANDMARK_DIST);
+  };
+
+  useEffect(() => {
+    if (!pending || !globe || !ready) return;
+    const lm = pending;
+    setPending(null);
+    flyToLandmark(lm);
+  }, [pending, globe, ready, setPending]);
 
   useEffect(() => {
     if (!globe) return;
@@ -96,24 +137,57 @@ export function GlobeView() {
       const header = 88;
       const stageH = window.innerHeight;
       const stageW = window.innerWidth;
+      const panel = document.getElementById("we-places");
+      const panelBox = panel?.getBoundingClientRect();
+      const rightInset =
+        panelBox && stageW >= 768 && panelBox.width > 40 && panelBox.top < stageH * 0.7
+          ? Math.max(0, stageW - panelBox.left) + 12
+          : 12;
+      const bottomInset =
+        panelBox && stageW < 768 && panelBox.height > 40 ? Math.max(12, stageH - panelBox.top + 8) : 12;
       const gap = 16;
       const belowBottom = pos.y + gap + boxH;
       const aboveTop = pos.y - gap - boxH;
-      const placeBelow = belowBottom <= stageH - 12 && (aboveTop < header || pos.y < stageH * 0.55);
+      const placeBelow = belowBottom <= stageH - bottomInset && (aboveTop < header || pos.y < stageH * 0.55);
       let top = placeBelow ? pos.y + gap : pos.y - gap - boxH;
-      top = Math.min(Math.max(top, header), Math.max(header, stageH - boxH - 12));
+      top = Math.min(Math.max(top, header), Math.max(header, stageH - boxH - bottomInset));
       const half = boxW / 2;
-      const left = Math.min(Math.max(pos.x, half + 10), stageW - half - 10);
+      const left = Math.min(Math.max(pos.x, half + 10), stageW - rightInset - half);
       node.style.left = `${left}px`;
       node.style.top = `${top}px`;
       node.style.transform = "translate(-50%, 0)";
     };
+    const hide = (node: HTMLDivElement | null) => {
+      if (!node) return;
+      node.style.visibility = "hidden";
+    };
+    const sameSpot = (a: MarkerPick, b: MarkerPick) =>
+      a.lat === b.lat && a.lng === b.lng && a.kind === b.kind;
     const tick = () => {
       raf = requestAnimationFrame(tick);
       const currentPick = pickRef.current;
       const currentHover = hoverRef.current;
-      if (currentPick) place(popupRef.current, currentPick.lat, currentPick.lng, 0.048);
-      if (currentHover) place(hoverTipRef.current, currentHover.lat, currentHover.lng, 0.036);
+      if (currentPick) place(popupRef.current, currentPick.lat, currentPick.lng, 0.08);
+      else hide(popupRef.current);
+      if (
+        currentHover &&
+        (currentHover.landmark?.name || currentHover.label) &&
+        !(currentPick && sameSpot(currentHover, currentPick))
+      ) {
+        place(hoverTipRef.current, currentHover.lat, currentHover.lng, 0.07);
+      } else {
+        hide(hoverTipRef.current);
+      }
+      const now = performance.now();
+      if (now - visAtRef.current > 180) {
+        visAtRef.current = now;
+        const vis = globe.visibleLandmarks(18);
+        const key = vis.map(landmarkId).join("|");
+        if (key !== visKeyRef.current) {
+          visKeyRef.current = key;
+          setVisible(vis);
+        }
+      }
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
@@ -139,18 +213,6 @@ export function GlobeView() {
     return () => document.removeEventListener("click", onDoc);
   }, []);
 
-  const selectLandmark = (lm: Landmark) => {
-    setQuery(lm.name);
-    setOpenResults(false);
-    setPick({ kind: "pin", lat: lm.lat, lng: lm.lng, landmark: lm });
-    const g = globe;
-    if (!g) return;
-    g.suppressPicks(700);
-    g.setFocus(lm);
-    setSpinning(false);
-    void g.flyTo(lm.lat, lm.lng, FLY_LANDMARK_DIST);
-  };
-
   const searchPlace = async (q: string) => {
     setOpenResults(false);
     try {
@@ -158,11 +220,11 @@ export function GlobeView() {
       const res = await fetch(url);
       if (!res.ok) return;
       const results = (await res.json()) as { lat: string; lon: string; display_name?: string }[];
-      const place = results?.[0];
-      if (!place) return;
-      const lat = parseFloat(place.lat);
-      const lng = parseFloat(place.lon);
-      const label = String(place.display_name ?? q);
+      const placeHit = results?.[0];
+      if (!placeHit) return;
+      const lat = parseFloat(placeHit.lat);
+      const lng = parseFloat(placeHit.lon);
+      const label = String(placeHit.display_name ?? q);
       globe?.dropGeocode(lat, lng, label);
       setPick({ kind: "geocode", lat, lng, label });
       globe?.setFocus(null);
@@ -173,14 +235,13 @@ export function GlobeView() {
     }
   };
 
-  const hoverLabel =
-    hover?.landmark?.name ?? hover?.label ?? "";
+  const hopIdx = pick?.landmark ? filtered.findIndex((m) => landmarkId(m) === landmarkId(pick.landmark!)) : -1;
+  const hoverLabel = hover?.landmark?.name ?? hover?.label ?? "";
 
   return (
     <div className="pointer-events-none">
-
       <header className={cn("map-chrome-enter pointer-events-none fixed inset-x-0 top-0 p-3 sm:p-4", chromeZ)}>
-        <div className="mx-auto flex max-w-5xl items-center gap-2 sm:gap-3">
+        <div className="mx-auto flex max-w-6xl items-center gap-2 sm:gap-3">
           <div className="pointer-events-auto hidden min-w-0 shrink-0 sm:block">
             <Wordmark
               to="/"
@@ -205,14 +266,14 @@ export function GlobeView() {
           </div>
 
           <div className="pointer-events-auto relative min-w-0 flex-1">
-            <div className="chrome relative flex h-12 items-center">
+            <div className="chrome relative flex h-12 items-center rounded-full">
               <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted" />
               <input
                 id="we-search"
                 type="text"
                 inputMode="search"
                 value={query}
-                placeholder="Search landmarks or a place…"
+                placeholder="Search a landmark or a place…"
                 autoComplete="off"
                 autoCorrect="off"
                 spellCheck={false}
@@ -220,13 +281,14 @@ export function GlobeView() {
                   setQuery(e.target.value);
                   setOpenResults(true);
                   setActiveIdx(-1);
+                  if (!panelOpen && window.innerWidth < 768) setPanelOpen(true);
                 }}
                 onFocus={() => query.trim() && setOpenResults(true)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
-                    if (activeIdx >= 0 && activeIdx < matches.length) selectLandmark(matches[activeIdx]);
-                    else if (matches[0]) selectLandmark(matches[0]);
+                    if (activeIdx >= 0 && activeIdx < matches.length) flyToLandmark(matches[activeIdx]);
+                    else if (matches[0]) flyToLandmark(matches[0]);
                     else if (query.trim()) void searchPlace(query);
                   } else if (e.key === "Escape") {
                     setOpenResults(false);
@@ -243,10 +305,10 @@ export function GlobeView() {
                 className="h-full w-full bg-transparent pr-4 pl-10 text-sm text-fg outline-none placeholder:text-muted"
               />
             </div>
-            {openResults && query.trim() && (
+            {openResults && query.trim() && !panelOpen && (
               <div
                 ref={resultsRef}
-                className="chrome absolute top-full right-0 left-0 mt-2 overflow-hidden"
+                className="chrome absolute top-full right-0 left-0 mt-2 overflow-hidden rounded-xl"
                 onPointerDown={(e) => e.stopPropagation()}
                 onPointerUp={(e) => e.stopPropagation()}
               >
@@ -254,7 +316,7 @@ export function GlobeView() {
                   <button
                     key={`${m.name}-${m.lat}`}
                     type="button"
-                    onClick={() => selectLandmark(m)}
+                    onClick={() => flyToLandmark(m)}
                     className={cn(
                       "flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm text-fg transition-colors duration-150 ease-out",
                       i === activeIdx ? "bg-surface-2" : "hover:bg-surface-2",
@@ -281,9 +343,26 @@ export function GlobeView() {
           </div>
 
           <div className="pointer-events-auto flex items-center gap-2">
-            <span className="chrome hidden px-3 py-2 text-xs text-muted tabular-nums sm:inline">
-              {landmarks.length ? `${landmarks.length}` : "—"}
-            </span>
+            <button
+              type="button"
+              aria-label={panelOpen ? "Hide places" : "Show places"}
+              aria-pressed={panelOpen}
+              onClick={() => setPanelOpen((v) => !v)}
+              className="chrome hidden size-12 items-center justify-center text-fg transition-transform duration-150 ease-out active:scale-[0.96] md:flex"
+            >
+              <List className="size-4" />
+            </button>
+            <button
+              type="button"
+              aria-label="Surprise me"
+              onClick={() => {
+                if (!filtered.length) return;
+                flyToLandmark(filtered[Math.floor(Math.random() * filtered.length)]);
+              }}
+              className="chrome flex size-12 items-center justify-center text-fg transition-transform duration-150 ease-out active:scale-[0.96]"
+            >
+              <Shuffle className="size-4" />
+            </button>
             <button
               type="button"
               aria-label={spinning ? "Pause spin" : "Resume spin"}
@@ -303,19 +382,25 @@ export function GlobeView() {
       {!ready && (
         <div className="chrome pointer-events-none fixed top-20 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 px-4 py-2 text-sm text-muted">
           <Loader2 className="size-4 animate-spin" />
-          Lighting the globe…
+          Bringing the globe in…
         </div>
       )}
 
+      <PlacesPanel
+        open={panelOpen}
+        landmarks={landmarks}
+        query={query}
+        group={group}
+        visible={visible}
+        selected={pick?.landmark ?? null}
+        onToggle={() => setPanelOpen((v) => !v)}
+        onSelect={flyToLandmark}
+        onGroup={setGroup}
+      />
+
       <div
         ref={hoverTipRef}
-        className={cn(
-          "pin-tip pointer-events-none fixed z-30 px-3 py-1.5 text-xs tracking-wide",
-          !hover ||
-            (pick && hover.lat === pick.lat && hover.lng === pick.lng && hover.kind === pick.kind)
-            ? "invisible"
-            : "",
-        )}
+        className="pin-tip pointer-events-none invisible fixed z-30 px-3 py-1.5 text-xs tracking-wide"
       >
         {hoverLabel}
       </div>
@@ -332,12 +417,15 @@ export function GlobeView() {
             key={`${pick.kind}-${pick.lat.toFixed(4)}-${pick.lng.toFixed(4)}`}
             pick={pick}
             onClose={() => setPick(null)}
+            onPrev={hopIdx > 0 ? () => flyToLandmark(filtered[hopIdx - 1]) : undefined}
+            onNext={hopIdx >= 0 && hopIdx < filtered.length - 1 ? () => flyToLandmark(filtered[hopIdx + 1]) : undefined}
+            indexLabel={hopIdx >= 0 ? `${hopIdx + 1} / ${filtered.length}` : undefined}
           />
         ) : null}
       </div>
 
-      <p className={cn("map-chrome-enter pointer-events-none fixed bottom-3 left-3 px-2 py-1 text-xs text-muted", chromeZ)}>
-        Drag to orbit · scroll to zoom · click a pin
+      <p className={cn("map-chrome-enter pointer-events-none fixed bottom-3 left-3 hidden px-2 py-1 text-xs text-muted md:block", chromeZ)}>
+        Drag to orbit · scroll to zoom · browse the list
       </p>
     </div>
   );

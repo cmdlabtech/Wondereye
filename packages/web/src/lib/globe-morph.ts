@@ -25,15 +25,20 @@ export function applyMapFrame(el: HTMLElement) {
   el.style.clipPath = "none";
 }
 
-function heightCircle(el: HTMLElement) {
+function frameSpan(el: HTMLElement) {
+  const w = el.clientWidth || window.innerWidth;
   const h = el.clientHeight || window.innerHeight;
-  return `circle(${h / 2}px at 50% 50%)`;
+  return { w, h, d: Math.min(w, h) };
+}
+
+function heightCircle(el: HTMLElement) {
+  const { d } = frameSpan(el);
+  return `circle(${d / 2}px at 50% 50%)`;
 }
 
 function orbTransform(el: HTMLElement, slot: GlobeSlot) {
-  const w = el.clientWidth || window.innerWidth;
-  const h = el.clientHeight || window.innerHeight;
-  const s = (slot.r * 2) / h;
+  const { w, h, d } = frameSpan(el);
+  const s = (slot.r * 2) / d;
   return `translate(${slot.x - w / 2}px, ${slot.y - h / 2}px) scale(${s})`;
 }
 

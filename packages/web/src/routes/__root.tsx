@@ -12,14 +12,14 @@ export const Route = createRootRoute({
       { title: APP_NAME },
       {
         name: "description",
-        content: "Search a place, spin the earth, land on the story.",
+        content: "Spin a sunlit globe, tap a mark, and read a short note.",
       },
-      { name: "theme-color", content: "#000000" },
+      { name: "theme-color", content: "#f4efe6" },
     ],
     links: [
       { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
       { rel: "stylesheet", href: appCss },
-      { rel: "preload", as: "image", href: "/earth-fs6.jpg", crossOrigin: "anonymous" },
+      { rel: "preload", as: "image", href: "/earth-blue-marble.jpg", crossOrigin: "anonymous" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {

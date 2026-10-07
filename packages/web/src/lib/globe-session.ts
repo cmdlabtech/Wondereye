@@ -18,11 +18,13 @@ type GlobeSession = {
   globe: WonderGlobe | null;
   landmarks: Landmark[];
   ready: boolean;
+  pendingLandmark: Landmark | null;
   setMode: (mode: GlobeMode) => void;
   setSlot: (slot: GlobeSlot | null) => void;
   setGlobe: (globe: WonderGlobe | null) => void;
   setLandmarks: (landmarks: Landmark[]) => void;
   setReady: (ready: boolean) => void;
+  setPendingLandmark: (landmark: Landmark | null) => void;
 };
 
 export const useGlobeSession = create<GlobeSession>((set) => ({
@@ -31,11 +33,13 @@ export const useGlobeSession = create<GlobeSession>((set) => ({
   globe: null,
   landmarks: [],
   ready: false,
+  pendingLandmark: null,
   setMode: (mode) => set({ mode }),
   setSlot: (slot) => set({ slot }),
   setGlobe: (globe) => set({ globe }),
   setLandmarks: (landmarks) => set({ landmarks }),
   setReady: (ready) => set({ ready }),
+  setPendingLandmark: (pendingLandmark) => set({ pendingLandmark }),
 }));
 
 export function useOpenMap() {
@@ -50,6 +54,16 @@ export function useOpenMap() {
       return;
     }
     setMode("opening");
+  };
+}
+
+export function useOpenLandmark() {
+  const openMap = useOpenMap();
+  const setPendingLandmark = useGlobeSession((s) => s.setPendingLandmark);
+
+  return (landmark: Landmark) => {
+    setPendingLandmark(landmark);
+    openMap();
   };
 }
 

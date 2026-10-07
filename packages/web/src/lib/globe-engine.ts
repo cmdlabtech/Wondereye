@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import type { Landmark } from "./landmarks";
 import { EARTH_URL, FLY_PLACE_DIST, type MarkerPick } from "./globe-types";
-import { createAtmosphereMesh, createEarthMaterial, studioLightDir } from "./globe-look";
+import { createAtmosphereMesh, createEarthMaterial, SCENE_BG, studioLightDir } from "./globe-look";
 
 export type { MarkerKind, MarkerPick } from "./globe-types";
 export { FLY_LANDMARK_DIST, FLY_PLACE_DIST } from "./globe-types";
@@ -60,7 +60,7 @@ function preloadEarthTexture() {
     },
     undefined,
     () => {
-      for (const wait of earthTexWaiters) wait(makeSolidTex(14, 14, 16) as unknown as THREE.Texture);
+      for (const wait of earthTexWaiters) wait(makeSolidTex(118, 148, 168) as unknown as THREE.Texture);
       earthTexWaiters.length = 0;
     },
   );
@@ -78,9 +78,11 @@ function whenEarthTexture(cb: (tex: THREE.Texture) => void) {
 preloadEarthTexture();
 const GLOBE_R = 1;
 const UP = new THREE.Vector3(0, 1, 0);
-const PIN_STEM_H = 0.026;
-const PIN_HEAD_R = 0.0105;
-const PIN_LIFT = 0.002;
+const PIN_MIN_PX = 11;
+const PIN_MAX_PX = 18;
+const PIN_IDLE = new THREE.Color(0xffffff);
+const PIN_ON = new THREE.Color(0xffe7d6);
+const PIN_DIM = new THREE.Color(0x908880);
 const MIN_DIST = 1.2;
 const MAX_DIST = 4;
 const START_LAT = 16;
@@ -155,40 +157,37 @@ function makeSolidTex(r: number, g: number, b: number): THREE.DataTexture {
   return tex;
 }
 
-let diamondTex: THREE.CanvasTexture | null = null;
+let pinTex: THREE.CanvasTexture | null = null;
 
-function getDiamondTexture(): THREE.CanvasTexture {
-  if (diamondTex) return diamondTex;
+function getPinTexture(): THREE.CanvasTexture {
+  if (pinTex) return pinTex;
+  const s = 256;
   const c = document.createElement("canvas");
-  c.width = c.height = 256;
+  c.width = c.height = s;
   const g = c.getContext("2d");
   if (!g) {
-    diamondTex = new THREE.CanvasTexture(c);
-    return diamondTex;
+    pinTex = new THREE.CanvasTexture(c);
+    return pinTex;
   }
-  g.lineJoin = "miter";
-  const diamond = (inset: number) => {
-    g.beginPath();
-    g.moveTo(128, inset);
-    g.lineTo(256 - inset, 128);
-    g.lineTo(128, 256 - inset);
-    g.lineTo(inset, 128);
-    g.closePath();
-  };
-  g.strokeStyle = "rgba(255,255,255,0.96)";
-  g.lineWidth = 14;
-  diamond(16);
-  g.stroke();
-  g.fillStyle = "rgba(255,255,255,0.26)";
-  g.strokeStyle = "rgba(255,255,255,0.58)";
-  g.lineWidth = 8;
-  diamond(64);
+  const cx = s / 2;
+  const glow = g.createRadialGradient(cx, cx, s * 0.16, cx, cx, s * 0.48);
+  glow.addColorStop(0, "rgba(208, 61, 42, 0.42)");
+  glow.addColorStop(0.55, "rgba(208, 61, 42, 0.12)");
+  glow.addColorStop(1, "rgba(208, 61, 42, 0)");
+  g.fillStyle = glow;
+  g.fillRect(0, 0, s, s);
+  g.beginPath();
+  g.arc(cx, cx, s * 0.22, 0, Math.PI * 2);
+  g.fillStyle = "#fff6ee";
   g.fill();
-  g.stroke();
-  diamondTex = new THREE.CanvasTexture(c);
-  diamondTex.colorSpace = THREE.SRGBColorSpace;
-  diamondTex.needsUpdate = true;
-  return diamondTex;
+  g.beginPath();
+  g.arc(cx, cx, s * 0.155, 0, Math.PI * 2);
+  g.fillStyle = "#d03d2a";
+  g.fill();
+  pinTex = new THREE.CanvasTexture(c);
+  pinTex.colorSpace = THREE.SRGBColorSpace;
+  pinTex.needsUpdate = true;
+  return pinTex;
 }
 
 function simplifyPolylines(lines: number[][][], minDeg: number): number[][][] {
@@ -258,6 +257,7 @@ export class WonderGlobe {
   private flying = false;
   private flyAnim: FlyAnim | null = null;
   private focusLandmark: Landmark | null = null;
+  private typeFilter: Set<string> | null = null;
   private reducedMotion: boolean;
   private ignorePickUntil = 0;
   private lastInput = 0;
@@ -289,7 +289,7 @@ export class WonderGlobe {
     this.reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x000000);
+    this.scene.background = new THREE.Color(SCENE_BG);
 
     this.camera = new THREE.PerspectiveCamera(60, 1, 0.1, 10);
     this.camera.position.copy(latLngToVec(START_LAT, START_LNG, START_DIST));
@@ -304,7 +304,7 @@ export class WonderGlobe {
     this.renderer.setPixelRatio(Math.min(bootDpr, 1));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.NoToneMapping;
-    this.renderer.setClearColor(0x000000, 1);
+    this.renderer.setClearColor(SCENE_BG, 1);
     this.canvas = this.renderer.domElement;
     this.canvas.style.display = "block";
     this.canvas.style.width = "100%";
@@ -313,8 +313,8 @@ export class WonderGlobe {
     this.canvas.style.cursor = "grab";
     container.appendChild(this.canvas);
 
-    this.earthMat = createEarthMaterial(makeSolidTex(14, 14, 16));
-    this.earth = new THREE.Mesh(new THREE.SphereGeometry(GLOBE_R, 128, 96), this.earthMat);
+    this.earthMat = createEarthMaterial(makeSolidTex(118, 148, 168));
+    this.earth = new THREE.Mesh(new THREE.SphereGeometry(GLOBE_R, 160, 120), this.earthMat);
     this.earth.name = "globe";
     this.scene.add(this.earth);
     this.atmosphere = createAtmosphereMesh(GLOBE_R);
@@ -347,7 +347,7 @@ export class WonderGlobe {
       this.lastInput = performance.now();
     });
 
-    this.raycaster.params.Points = { threshold: 0.07 };
+    this.raycaster.params.Points = { threshold: 0.05 };
     this.canvas.addEventListener("pointerdown", this.onPointerDown);
     this.canvas.addEventListener("pointerup", this.onPointerUp);
     this.canvas.addEventListener("pointermove", this.onPointerMove);
@@ -394,6 +394,11 @@ export class WonderGlobe {
     const w = Math.max(1, this.container.clientWidth);
     const h = Math.max(1, this.container.clientHeight);
     this.camera.aspect = w / h;
+    const minSideFov = 60;
+    this.camera.fov =
+      w >= h
+        ? minSideFov
+        : THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(minSideFov) / 2) * (h / w)));
     this.camera.updateProjectionMatrix();
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     this.renderer.setPixelRatio(dpr);
@@ -403,9 +408,17 @@ export class WonderGlobe {
 
   private syncPinSize() {
     if (!this.pinPoints) return;
+    const dist = this.camera.position.length();
+    const h = Math.max(1, this.container.clientHeight);
+    const distToSurf = Math.max(dist - GLOBE_R, 0.18);
+    const t = THREE.MathUtils.clamp(THREE.MathUtils.inverseLerp(MIN_DIST, 2.7, dist), 0, 1);
+    const targetPx = THREE.MathUtils.lerp(PIN_MAX_PX, PIN_MIN_PX, t);
     const mat = this.pinPoints.material as THREE.PointsMaterial;
-    const minSide = Math.min(this.container.clientWidth, this.container.clientHeight);
-    mat.size = THREE.MathUtils.clamp(minSide * 0.05, 26, 32);
+    mat.size = (targetPx * 2 * distToSurf) / h;
+    if (this.geoMarker) {
+      const world = targetPx * ((2 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2) * distToSurf) / h);
+      this.geoMarker.scale.setScalar(world);
+    }
   }
 
   private async loadBorders(kind: "c" | "s") {
@@ -419,10 +432,10 @@ export class WonderGlobe {
       const lines = (await res.json()) as number[][][];
       if (this.disposed) return;
       if (kind === "c" && !this.countryMat) {
-        this.countryMat = this.addBorderLayer(simplifyPolylines(lines, 0.45), 0xffffff, 0.22, GLOBE_R * 1.003);
+        this.countryMat = this.addBorderLayer(simplifyPolylines(lines, 0.45), 0x2a241c, 0.12, GLOBE_R * 1.003);
       }
       if (kind === "s" && !this.stateMat) {
-        this.stateMat = this.addBorderLayer(simplifyPolylines(lines, 0.9), 0xffffff, 0, GLOBE_R * 1.0022);
+        this.stateMat = this.addBorderLayer(simplifyPolylines(lines, 0.9), 0x3d3428, 0, GLOBE_R * 1.0022);
         this.statesLoaded = true;
       }
       this.fadeBorders();
@@ -462,7 +475,7 @@ export class WonderGlobe {
     if (Math.abs(dist - this.lastBorderDist) < 0.012) return;
     this.lastBorderDist = dist;
     const zoom = THREE.MathUtils.clamp(THREE.MathUtils.inverseLerp(2.35, 1.38, dist), 0, 1);
-    if (this.countryMat) this.countryMat.opacity = THREE.MathUtils.lerp(0.14, 0.28, zoom);
+    if (this.countryMat) this.countryMat.opacity = THREE.MathUtils.lerp(0.08, 0.18, zoom);
     if (this.presentation === "map" && zoom > 0.12) void this.loadBorders("s");
     if (this.stateMat) {
       this.stateMat.opacity = zoom < 0.12 ? 0 : THREE.MathUtils.lerp(0, 0.14, zoom);
@@ -485,6 +498,30 @@ export class WonderGlobe {
     this.tintPins();
   }
 
+  setTypeFilter(types: string[] | null) {
+    this.typeFilter = types && types.length ? new Set(types) : null;
+    this.tintPins();
+  }
+
+  visibleLandmarks(limit = 24): Landmark[] {
+    if (!this.pinPoints) return [];
+    const pos = this.pinPoints.geometry.getAttribute("position");
+    const camLen = this.camera.position.length();
+    if (camLen < 1e-5) return [];
+    const hits: { lm: Landmark; score: number }[] = [];
+    for (let i = 0; i < this.pinPicks.length; i++) {
+      const lm = this.pinPicks[i].landmark;
+      if (!lm) continue;
+      if (this.typeFilter && !this.typeFilter.has(lm.type)) continue;
+      _tmp.set(pos.getX(i), pos.getY(i), pos.getZ(i));
+      const score = _tmp.dot(this.camera.position) / (_tmp.length() * camLen);
+      if (score < 0.42) continue;
+      hits.push({ lm, score });
+    }
+    hits.sort((a, b) => b.score - a.score);
+    return hits.slice(0, limit).map((h) => h.lm);
+  }
+
   getView(): GlobeViewInfo {
     const { lat, lng } = vecToLatLng(this.camera.position);
     return {
@@ -495,7 +532,7 @@ export class WonderGlobe {
     };
   }
 
-  project(lat: number, lng: number, lift = PIN_STEM_H + PIN_HEAD_R): { x: number; y: number; visible: boolean } | null {
+  project(lat: number, lng: number, lift = 0.02): { x: number; y: number; visible: boolean } | null {
     latLngToVec(lat, lng, GLOBE_R + lift, _projWorld);
     _projCam.copy(this.camera.position).normalize();
     _projN.copy(_projWorld).normalize();
@@ -568,7 +605,7 @@ export class WonderGlobe {
       this.geoMarker = null;
     }
     const mat = new THREE.SpriteMaterial({
-      map: getDiamondTexture(),
+      map: getPinTexture(),
       transparent: true,
       depthTest: true,
       depthWrite: false,
@@ -576,9 +613,10 @@ export class WonderGlobe {
       color: 0xffffff,
     });
     const sprite = new THREE.Sprite(mat);
-    latLngToVec(lat, lng, GLOBE_R * 1.014, _tmp);
+    sprite.center.set(0.5, 0.5);
+    latLngToVec(lat, lng, GLOBE_R * 1.01, _tmp);
     sprite.position.copy(_tmp);
-    sprite.scale.setScalar(0.058);
+    sprite.scale.setScalar(0.028);
     this.scene.add(sprite);
     this.geoMarker = sprite;
     this.geoPick = { kind: "geocode", lat, lng, label };
@@ -666,6 +704,7 @@ export class WonderGlobe {
       else if (!this.flying) this.wantSpin = !this.reducedMotion;
     }
     if (this.landmarks.length && !this.pinPoints) this.rebuildMarkers();
+    if (this.pinPoints) this.pinPoints.visible = !hero;
     if (changed) this.sizeRenderer();
   }
 
@@ -816,7 +855,7 @@ export class WonderGlobe {
     this.pinPicks = [];
     for (let i = 0; i < n; i++) {
       const lm = this.landmarks[i];
-      latLngToVec(lm.lat, lm.lng, GLOBE_R * 1.012, _tmp);
+      latLngToVec(lm.lat, lm.lng, GLOBE_R * 1.01, _tmp);
       pos[i * 3] = _tmp.x;
       pos[i * 3 + 1] = _tmp.y;
       pos[i * 3 + 2] = _tmp.z;
@@ -833,17 +872,18 @@ export class WonderGlobe {
     geo.setAttribute("color", colors);
     this.pinColors = colors;
     const mat = new THREE.PointsMaterial({
-      map: getDiamondTexture(),
+      map: getPinTexture(),
       vertexColors: true,
       transparent: true,
       depthTest: true,
       depthWrite: false,
-      size: 28,
-      sizeAttenuation: false,
-      alphaTest: 0.2,
+      size: 16,
+      sizeAttenuation: true,
+      alphaTest: 0.08,
     });
     this.pinPoints = new THREE.Points(geo, mat);
     this.pinPoints.renderOrder = 4;
+    this.pinPoints.visible = this.presentation === "map";
     this.scene.add(this.pinPoints);
     this.syncPinSize();
     this.tintPins();
@@ -853,11 +893,14 @@ export class WonderGlobe {
     if (!this.pinColors) return;
     const arr = this.pinColors.array as Float32Array;
     for (let i = 0; i < this.pinPicks.length; i++) {
-      const on = this.selected === this.pinPicks[i] || this.hovered === this.pinPicks[i];
-      const v = on ? 1 : 0.88;
-      arr[i * 3] = v;
-      arr[i * 3 + 1] = v;
-      arr[i * 3 + 2] = v;
+      const pick = this.pinPicks[i];
+      const lm = pick.landmark;
+      const on = this.selected === pick || this.hovered === pick;
+      const dim = !!(this.typeFilter && lm && !this.typeFilter.has(lm.type));
+      const c = dim && !on ? PIN_DIM : on ? PIN_ON : PIN_IDLE;
+      arr[i * 3] = c.r;
+      arr[i * 3 + 1] = c.g;
+      arr[i * 3 + 2] = c.b;
     }
     this.pinColors.needsUpdate = true;
   }
@@ -885,7 +928,7 @@ export class WonderGlobe {
   private spawnRipple(point: THREE.Vector3) {
     if (this.reducedMotion) return;
     const mat = new THREE.MeshBasicMaterial({
-      color: 0xffffff,
+      color: 0xc24e1d,
       transparent: true,
       opacity: 0.5,
       side: THREE.DoubleSide,
@@ -996,6 +1039,7 @@ export class WonderGlobe {
       }
     }
 
+    this.syncPinSize();
     this.fadeBorders();
     this.syncLight();
     this.syncAtmosphere();
