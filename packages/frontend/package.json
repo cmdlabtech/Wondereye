@@ -6,10 +6,12 @@
     "build": "vite build",
     "deploy": "node ../../scripts/compose-site.mjs && wrangler deploy",
     "build:ehpk": "vite build --mode ehpk --base ./ --outDir dist-ehpk",
-    "pack": "npm run build:ehpk && cp dist-ehpk/app.html dist-ehpk/index.html && evenhub pack app.json dist-ehpk --sdk-ver 0.0.14 -o wondereye.ehpk && rm -rf dist-ehpk"
+    "pack": "npm run build:ehpk && cp dist-ehpk/app.html dist-ehpk/index.html && evenhub pack app.json dist-ehpk --sdk-ver 0.0.14 -o wondereye.ehpk && rm -rf dist-ehpk",
+    "test": "vitest run"
   },
   "dependencies": {
     "@evenrealities/even_hub_sdk": "0.0.14",
+    "@evenrealities/pretext": "^0.1.4",
     "@types/leaflet.markercluster": "^1.5.6",
     "leaflet": "^1.9.4",
     "leaflet.markercluster": "^1.5.3"
@@ -21,6 +23,7 @@
     "@types/node": "^25.6.0",
     "typescript": "^5.9.3",
     "vite": "^8.0.10",
+    "vitest": "^3.2.7",
     "wrangler": "^4.84.1"
   }
 }

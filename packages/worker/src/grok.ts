@@ -1,5 +1,6 @@
 import { Landmark, LandmarkDetailInput, RawPOI } from './types';
 import { fetchWikidataDescriptions } from './wikidata';
+import { detailLanguageInstruction, Lang, lengthBudget, snippetLanguageInstruction } from './lang';
 
 export const GROK_SNIPPET_MODEL = 'grok-4.3';
 // This xAI team cannot call grok-4.6; 4.3 + web search + low reasoning is the
@@ -78,14 +79,23 @@ export function replaceDashes(text: string): string {
     .replace(/,\s*([.!?,;:])/g, '$1');
 }
 
+/** Index of the last sentence-ending mark in `cut` (Latin ". " or CJK "。！？"), or -1. */
+function lastSentenceStop(cut: string): number {
+  return Math.max(
+    cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '),
+    cut.endsWith('.') ? cut.length - 1 : -1,
+    cut.lastIndexOf('\u3002'), cut.lastIndexOf('\uff01'), cut.lastIndexOf('\uff1f'),
+  );
+}
+
 /** Cap at the last full sentence that fits; fall back to a word boundary. */
 function capAtSentence(text: string, max: number): string {
   if (text.length <= max) return text;
   const cut = text.slice(0, max + 1);
-  const stop = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '), cut.endsWith('.') ? cut.length - 1 : -1);
+  const stop = lastSentenceStop(cut);
   if (stop >= max * 0.5) return cut.slice(0, stop + 1).trim();
   const space = text.lastIndexOf(' ', max - 1);
-  return `${text.slice(0, space > 0 ? space : max - 1).replace(/[,;:]$/, '')}\u2026`;
+  return `${text.slice(0, space > 0 ? space : max - 1).replace(/[,;:\u3001\uff0c]$/, '')}\u2026`;
 }
 
 /** Reader/distance references that do not belong on a public map card. */
@@ -127,7 +137,7 @@ export function stripReaderReferences(text: string): string {
  * the reader's location (public map card), restore sentence capitalization,
  * and cap the length so it fits one glasses page.
  */
-export function cleanSnippet(raw: string): string {
+export function cleanSnippet(raw: string, max: number = SNIPPET_MAX_CHARS): string {
   let s = raw.replace(/\s*\(\d+\s*chars?\)\.?/gi, '').replace(/\s+/g, ' ').trim();
   if (!s) return s;
   s = s.replace(
@@ -144,7 +154,7 @@ export function cleanSnippet(raw: string): string {
   if (!s) return s;
   const letter = s.search(/[\p{L}]/u);
   if (letter >= 0) s = s.slice(0, letter) + s.charAt(letter).toUpperCase() + s.slice(letter + 1);
-  s = capAtSentence(s, SNIPPET_MAX_CHARS);
+  s = capAtSentence(s, max);
   return s.replace(/([.!?])(\s+)(\p{Ll})/gu, (full, punc: string, space: string, ch: string, offset: number, src: string) => {
     const before = String(src).slice(0, Number(offset) + 1);
     // Leave abbreviations alone ("St. john", "U.S. army").
@@ -158,7 +168,9 @@ export function cleanSnippet(raw: string): string {
  * web map card) and by the offline map regeneration script, so both produce
  * the same style and length.
  */
-export const DESCRIPTION_RULES = `For each place write a short description in 2 or 3 complete sentences, about ${SNIPPET_TARGET_CHARS} characters and never more than ${SNIPPET_MAX_CHARS}. It is shown on the glasses and on the public Wondereye map, so it must be informative on its own:
+export function descriptionRules(lang: Lang = 'en'): string {
+  const budget = lengthBudget(lang);
+  return `For each place write a short description in 2 or 3 complete sentences, about ${budget.snippetTarget} characters and never more than ${budget.snippetMax}. It is shown on the glasses and on the public Wondereye map, so it must be informative on its own:
 1. What it is: the kind of place and one identifying detail (style, setting, or purpose).
 2. When and by whom it was built, founded, or made, if you are certain.
 3. One notable fact or why it matters: a record, a historic event, its purpose, or a visible feature.
@@ -180,7 +192,10 @@ Style: plain and factual, like the opening of an encyclopedia entry read aloud b
 Example: "St. Vitus Cathedral is the Gothic cathedral inside Prague Castle and the seat of the Archbishop of Prague. Charles IV began it in 1344, and it was completed only in 1929. The Bohemian Crown Jewels are kept in a chamber above its Chapel of St. Wenceslas."
 
 Write each fact directly. Do not announce, rank, or label it. Never use "the most interesting fact", "interesting fact", "fun fact", "did you know", or "it matters as/for". Do not write a full history; more background is available on request.
-No markdown, no bullet points, no character counts. Return ONLY a JSON array of objects with "name" and "snippet" fields. The "name" must exactly match the candidate name="..." value. Do not append the type or other fields.`;
+No markdown, no bullet points, no character counts. Return ONLY a JSON array of objects with "name" and "snippet" fields. The "name" must exactly match the candidate name="..." value. Do not append the type or other fields.${snippetLanguageInstruction(lang)}`;
+}
+
+export const DESCRIPTION_RULES = descriptionRules('en');
 
 export function parseSnippetList(text: string): Array<{ name: string; snippet: string }> {
   let parsed: unknown;
@@ -222,8 +237,10 @@ function copyPoiContext(poi: RawPOI): Partial<Landmark> {
 export async function generateSnippets(
   pois: RawPOI[],
   apiKey: string,
-  origin: { lat: number; lng: number }
+  origin: { lat: number; lng: number },
+  lang: Lang = 'en'
 ): Promise<Landmark[]> {
+  const budget = lengthBudget(lang);
   const nameList = pois.map(formatCandidate).join('\n');
 
   const response = await fetch(XAI_CHAT, {
@@ -245,7 +262,7 @@ export async function generateSnippets(
           content: `The visitor is at ${origin.lat.toFixed(4)}, ${origin.lng.toFixed(4)}. Distances below are from that point.
 From the list, pick up to 5 places they would actually want to look at from here. Rank by a mix of notability and proximity: famous landmarks and historic sites that are nearby first, then notable local places if fewer than 5 major ones are close.
 
-${DESCRIPTION_RULES}
+${descriptionRules(lang)}
 
 Candidates:
 ${nameList}`,
@@ -273,7 +290,7 @@ ${nameList}`,
         distance: poi.distance,
         lat: poi.lat,
         lng: poi.lng,
-        snippet: cleanSnippet(s.snippet),
+        snippet: cleanSnippet(s.snippet, budget.snippetMax),
         ...copyPoiContext(poi),
       };
     })
@@ -297,7 +314,7 @@ function responsesOutputText(data: any): string {
   return parts.join('\n').trim();
 }
 
-function toPlainGuideText(text: string): string {
+function toPlainGuideText(text: string, cap = 900): string {
   const cleaned = text
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
     .replace(/\[\[\d+\]\]\([^)]*\)/g, '')
@@ -309,16 +326,18 @@ function toPlainGuideText(text: string): string {
     .replace(/\n{3,}/g, '\n\n')
     .trim();
   const out = replaceDashes(cleaned);
-  if (out.length <= 900) return out;
-  const sliced = out.slice(0, 900);
-  const last = Math.max(sliced.lastIndexOf('. '), sliced.lastIndexOf('! '), sliced.lastIndexOf('? '));
-  return (last > 200 ? sliced.slice(0, last + 1) : sliced).trim();
+  if (out.length <= cap) return out;
+  const sliced = out.slice(0, cap);
+  const last = lastSentenceStop(sliced);
+  return (last > Math.round((cap * 2) / 9) ? sliced.slice(0, last + 1) : sliced).trim();
 }
 
 export async function generateDetail(
   input: LandmarkDetailInput,
-  apiKey: string
+  apiKey: string,
+  lang: Lang = 'en'
 ): Promise<string> {
+  const budget = lengthBudget(lang);
   const unitHint = input.units === 'metric'
     ? 'Use metric units (meters, kilometers) for any distances or measurements.'
     : 'Use imperial units (feet, miles) for any distances or measurements.';
@@ -369,11 +388,11 @@ export async function generateDetail(
       input: [
         {
           role: 'system',
-          content: `You are a knowledgeable tour guide standing with a visitor at this exact place. Use your own knowledge and, if needed, search Grokipedia for THIS specific site at the given coordinates, not a different place that shares the name. Do not use Wikipedia as a source. Only state facts you are certain of; if sources disagree or you cannot confirm a date, number, or name, leave it out. Saying less is better than guessing. Write plain text only: no markdown, no bullet points, no citation markers, no URLs, no headings. Speak as a guide, not a trivia card: state details directly with no fact labels. Plain factual tone; no slogans, hype words, or em dashes. ${unitHint}`,
+          content: `You are a knowledgeable tour guide standing with a visitor at this exact place. Use your own knowledge and, if needed, search Grokipedia for THIS specific site at the given coordinates, not a different place that shares the name. Do not use Wikipedia as a source. Only state facts you are certain of; if sources disagree or you cannot confirm a date, number, or name, leave it out. Saying less is better than guessing. Write plain text only: no markdown, no bullet points, no citation markers, no URLs, no headings. Speak as a guide, not a trivia card: state details directly with no fact labels. Plain factual tone; no slogans, hype words, or em dashes. ${unitHint}${detailLanguageInstruction(lang)}`,
         },
         {
           role: 'user',
-          content: `${alreadyRead}Give the next layer of background on this landmark in full sentences. Add facts the snippet did not cover: history and the people involved, why this specific site is notable, and one thing they can notice in person. Keep it under 800 characters. Do not use "the most interesting fact", "fun fact", or "it matters as" phrasing. Leave out physical details (materials, colors, dimensions, heights, seat counts, capacities) unless you are certain of them; when unsure, omit them rather than guess. If the place no longer exists (demolished, destroyed, or a temporary exhibition structure), say so and use the past tense. Do not state the visitor's distance or position. If little is reliably known about this place, keep it short and descriptive instead of filling space.
+          content: `${alreadyRead}Give the next layer of background on this landmark in full sentences. Add facts the snippet did not cover: history and the people involved, why this specific site is notable, and one thing they can notice in person. Keep it under ${budget.detailTarget} characters. Do not use "the most interesting fact", "fun fact", or "it matters as" phrasing. Leave out physical details (materials, colors, dimensions, heights, seat counts, capacities) unless you are certain of them; when unsure, omit them rather than guess. If the place no longer exists (demolished, destroyed, or a temporary exhibition structure), say so and use the past tense. Do not state the visitor's distance or position. If little is reliably known about this place, keep it short and descriptive instead of filling space.
 
 ${facts.join('\n')}`,
         },
@@ -387,5 +406,5 @@ ${facts.join('\n')}`,
   }
 
   const data: any = await response.json();
-  return toPlainGuideText(responsesOutputText(data));
+  return toPlainGuideText(responsesOutputText(data), budget.detailCap);
 }

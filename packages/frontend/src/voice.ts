@@ -1,6 +1,7 @@
 import { AudioInputSource } from '@evenrealities/even_hub_sdk';
 import { getBridge } from './bridge';
 import { AppState } from './types';
+import { isLookingAtPhrase, t } from './i18n';
 import { fetchTranscribe, fetchLandmarkDetail } from './api';
 import { renderListening, renderVoiceResult, renderList, renderError, renderReadingPage, paginateText } from './renderer';
 import { getUnits } from './units';
@@ -85,17 +86,7 @@ function clearVoiceTimers(state: AppState): void {
 }
 
 function isCurrentLandmarkQuery(query: string): boolean {
-  const q = query.toLowerCase();
-  return (
-    q.includes('looking at') ||
-    q.includes('what is this') ||
-    q.includes("what's this") ||
-    q.includes('what am i seeing') ||
-    q.includes('tell me about this') ||
-    q.includes('what is here') ||
-    q.includes('what are we looking at') ||
-    q.includes('what is in front')
-  );
+  return isLookingAtPhrase(query);
 }
 
 // render=false is for lifecycle handlers (background/exit) where drawing to the
@@ -190,7 +181,7 @@ export async function stopVoiceRecording(state: AppState): Promise<void> {
   } catch (err) {
     console.error('[voice] transcribe error:', err);
     state.mode = 'error';
-    state.errorMessage = 'Voice search failed.\nPlease try again.';
+    state.errorMessage = t('e.voiceFailed');
     renderError(state.errorMessage).catch(() => {});
   }
 }

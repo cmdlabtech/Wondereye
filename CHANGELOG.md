@@ -2,6 +2,14 @@
 
 ## v1.6.6 - Unreleased
 
+### Languages
+- Wondereye is now available in English, German, French, Spanish, Italian, Simplified Chinese, Japanese, and Korean. The glasses display, the phone settings page, the feedback form, and error messages are shown in your language.
+- The language is selected automatically from the Even Realities App or phone language and defaults to English when your language is not supported. You may choose a different language at any time under Settings > Language.
+- Landmark descriptions are written by Grok directly in the selected language. Place names are kept in their local or official form, and the same accuracy rules apply in every language. No Wikipedia text is used in descriptions.
+- Text on the glasses is now measured against the glasses font, so longer words and Chinese, Japanese, and Korean characters fit each line and page without being cut off.
+- Dates are shown in the format of your language. Metric units are the default for languages other than English until you choose a unit.
+- Only English descriptions are added to the community map at this time.
+
 ### Feedback
 - A Send Feedback form is now available in the phone settings page and on the wondereye.app map. You may report a bug, suggest an idea, or share other comments without providing an email address or creating an account.
 - Submitted feedback is posted to the public Wondereye issue tracker on GitHub for review. Please do not include personal information in your message.

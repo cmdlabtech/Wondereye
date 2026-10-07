@@ -3,9 +3,9 @@
 // schema, origin) run server-side. No secret lives in this bundle; the
 // Turnstile sitekey is public by design.
 import { API_BASE_URL } from './constants';
+import { getLang, t } from './i18n';
 
 const SITEKEY: string = import.meta.env.VITE_TURNSTILE_SITEKEY || '0x4AAAAAAFQyWWYVPcIJm6E7'; // public Turnstile sitekey (wondereye.app, 127.0.0.1)
-const GENERIC_ERROR = "Feedback couldn't be sent. Please try again later.";
 
 type TurnstileApi = {
   render: (el: HTMLElement, opts: Record<string, unknown>) => string;
@@ -73,12 +73,13 @@ export function initFeedbackForm(): void {
           theme: 'dark',
           size: 'flexible',
           action: 'feedback',
+          language: getLang() === 'zh' ? 'zh-cn' : getLang(),
           callback: (t: string) => { token = t; refresh(); },
           'expired-callback': () => { token = ''; refresh(); },
           'error-callback': () => { token = ''; refresh(); },
         });
       })
-      .catch(() => { status.textContent = 'Verification could not load. Please try again later.'; });
+      .catch(() => { status.textContent = t('p.verifyFail'); });
   });
 
   form.addEventListener('submit', async (e) => {
@@ -86,9 +87,9 @@ export function initFeedbackForm(): void {
     if (submit.disabled) return;
     sending = true;
     refresh();
-    status.textContent = 'Sending…';
+    status.textContent = t('p.sending');
     let ok = false;
-    let error = '';
+    let httpStatus = 0;
     try {
       const res = await fetch(`${API_BASE_URL}/api/feedback`, {
         method: 'POST',
@@ -107,7 +108,7 @@ export function initFeedbackForm(): void {
       });
       const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
       ok = res.ok && !!data.ok;
-      error = data.error ?? '';
+      httpStatus = res.status;
     } catch {
       /* network failure */
     }
@@ -117,10 +118,11 @@ export function initFeedbackForm(): void {
       Array.from(form.children).forEach((el) => {
         if (el !== status) (el as HTMLElement).hidden = true;
       });
-      status.textContent = 'Thank you. Your feedback has been received and will be reviewed.';
+      status.textContent = t('p.thanks');
       return;
     }
-    status.textContent = error || GENERIC_ERROR;
+    // The API's error text is English; show the localized equivalent.
+    status.textContent = httpStatus === 429 ? t('p.fbTooMany') : t('p.fbError');
     token = '';
     ts?.reset(widgetId);
     refresh();

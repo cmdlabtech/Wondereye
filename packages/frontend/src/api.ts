@@ -1,6 +1,7 @@
 import { Landmark } from './types';
 import { API_BASE_URL } from './constants';
 import { getRadius } from './radius';
+import { getLang, t } from './i18n';
 
 function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371000;
@@ -28,12 +29,12 @@ export class LandmarkApiError extends Error {
 
 function friendlyApiError(status: number): LandmarkApiError {
   if (status === 429) {
-    return new LandmarkApiError('Too many requests.\nWait a minute, then tap to retry.', status);
+    return new LandmarkApiError(t('e.tooMany'), status);
   }
   if (status >= 500) {
-    return new LandmarkApiError('Landmark service is busy.\nTap to retry in a moment.', status);
+    return new LandmarkApiError(t('e.busy'), status);
   }
-  return new LandmarkApiError(`Could not load landmarks (${status}).\nTap to retry.`, status);
+  return new LandmarkApiError(t('e.http', { status }), status);
 }
 
 export async function fetchLandmarks(lat: number, lng: number): Promise<Landmark[]> {
@@ -44,15 +45,15 @@ export async function fetchLandmarks(lat: number, lng: number): Promise<Landmark
     response = await fetch(`${API_BASE_URL}/api/landmarks`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ lat, lng, radius: getRadius() }),
+      body: JSON.stringify({ lat, lng, radius: getRadius(), lang: getLang() }),
       signal: controller.signal,
     });
   } catch (e) {
     const aborted = (e as { name?: string })?.name === 'AbortError';
     throw new LandmarkApiError(
       aborted
-        ? 'Landmark lookup timed out.\nTap to retry.'
-        : 'No connection to Wondereye.\nCheck your phone, then tap to retry.',
+        ? t('e.timeout')
+        : t('e.offline'),
     );
   } finally {
     clearTimeout(timer);
@@ -96,6 +97,7 @@ export async function fetchLandmarkDetail(landmark: Landmark, units: 'imperial' 
       architect: landmark.architect,
       city: landmark.city,
       units,
+      lang: getLang(),
     }),
   });
 
