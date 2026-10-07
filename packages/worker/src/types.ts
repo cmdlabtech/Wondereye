@@ -60,4 +60,14 @@ export type Bindings = {
   ALLOWED_ORIGIN?: string;
   LANDMARKS_CACHE: KVNamespace;
   DEV?: string;
+  // Feedback (POST /api/feedback). Secrets: TURNSTILE_SECRET, GITHUB_FEEDBACK_TOKEN.
+  // Vars: FEEDBACK_ENABLED ("true" to turn on), TURNSTILE_HOSTNAMES (comma list,
+  // default "wondereye.app"), FEEDBACK_REPO (default "cmdlabtech/Wondereye"),
+  // FEEDBACK_DRY_RUN ("true" = never call GitHub; local preview only).
+  TURNSTILE_SECRET?: string;
+  GITHUB_FEEDBACK_TOKEN?: string;
+  FEEDBACK_ENABLED?: string;
+  TURNSTILE_HOSTNAMES?: string;
+  FEEDBACK_REPO?: string;
+  FEEDBACK_DRY_RUN?: string;
 };

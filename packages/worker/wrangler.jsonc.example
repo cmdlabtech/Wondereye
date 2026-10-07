@@ -20,6 +20,15 @@
   "routes": [
     { "pattern": "api.wondereye.app", "custom_domain": true }
   ],
+  // Feedback (POST /api/feedback) — see docs/feedback.md. ALLOWED_ORIGIN
+  // (existing, set as before) must include https://wondereye.app.
+  // Secrets (never in this file): wrangler secret put TURNSTILE_SECRET
+  //                               wrangler secret put GITHUB_FEEDBACK_TOKEN
+  "vars": {
+    "FEEDBACK_ENABLED": "false",
+    "TURNSTILE_HOSTNAMES": "wondereye.app",
+    "FEEDBACK_REPO": "cmdlabtech/Wondereye"
+  },
   "kv_namespaces": [
     {
       "binding": "LANDMARKS_CACHE",

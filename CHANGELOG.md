@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.6.6 - Unreleased
+
+### Feedback
+- A Send Feedback form is now available in the phone settings page and on the wondereye.app map. You may report a bug, suggest an idea, or share other comments without providing an email address or creating an account.
+- Submitted feedback is posted to the public Wondereye issue tracker on GitHub for review. Please do not include personal information in your message.
+- Submissions are protected by Cloudflare Turnstile verification and rate limits to prevent abuse.
+
+### Platform
+- The network allowlist now includes Cloudflare Turnstile (`challenges.cloudflare.com`), which is required for feedback verification.
+
 ## v1.6.5 - 2026-09-26
 
 ### Landmark reliability
