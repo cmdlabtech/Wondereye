@@ -121,3 +121,36 @@ export function loadLandmarks(onUpdate?: (list: Landmark[]) => void): Promise<La
   else if (onUpdate) void pending.then(onUpdate);
   return pending;
 }
+// ---- Deep links (?p=<slug>) ------------------------------------------------
+// A slug is the place name, lowercased with accents and punctuation stripped
+// (non-Latin letters are kept). When two places share that name, the slug
+// carries rounded coordinates after "~" so the link stays unambiguous.
+
+export function nameSlug(name: string): string {
+  return name
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+}
+
+export function landmarkSlug(m: Landmark, list: Landmark[]): string {
+  const base = nameSlug(m.name) || "place";
+  const id = landmarkId(m);
+  const twins = list.filter((o) => landmarkId(o) !== id && nameSlug(o.name) === base);
+  return twins.length ? `${base}~${m.lat.toFixed(4)},${m.lng.toFixed(4)}` : base;
+}
+
+export function findBySlug(list: Landmark[], slug: string): Landmark | null {
+  const [base, coords] = slug.split("~");
+  if (!base) return null;
+  const hits = list.filter((m) => nameSlug(m.name) === base);
+  if (!coords) return hits[0] ?? null;
+  const [lat, lng] = coords.split(",").map(Number);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return hits[0] ?? null;
+  const near = (m: Landmark) => Math.abs(m.lat - lat) + Math.abs(m.lng - lng);
+  const pool = hits.length ? hits : list.filter((m) => near(m) < 0.0005);
+  return pool.sort((a, b) => near(a) - near(b))[0] ?? null;
+}

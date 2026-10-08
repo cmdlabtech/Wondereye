@@ -11,6 +11,16 @@ function preloadGlobeEngine(): Plugin {
       if (!ctx.bundle) return [];
       const tags: HtmlTagDescriptor[] = [];
       for (const [file, chunk] of Object.entries(ctx.bundle)) {
+        // Preload the hashed globe texture in the same CORS mode three.js's
+        // TextureLoader uses ("anonymous"), so preload and texture share one fetch.
+        if (chunk.type === "asset" && /earth-blue-marble-[\w-]+\.webp$/.test(file)) {
+          tags.push({
+            tag: "link",
+            attrs: { rel: "preload", as: "image", type: "image/webp", href: `/${file}`, crossorigin: "anonymous" },
+            injectTo: "head",
+          });
+          continue;
+        }
         if (chunk.type !== "chunk") continue;
         if (!file.includes("globe-engine")) continue;
         tags.push({

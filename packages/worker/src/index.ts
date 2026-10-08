@@ -402,7 +402,11 @@ app.post('/api/transcribe', async (c) => {
 // remainder migrates on subsequent cache misses.
 const LEGACY_MIGRATE_LIMIT = 300;
 
+// Browsers may reuse the map list for a minute; shared caches for five.
+const MAP_RESPONSE_CACHE_CONTROL = 'public, s-maxage=300, max-age=60';
+
 app.get('/api/map', async (c) => {
+  c.header('Cache-Control', MAP_RESPONSE_CACHE_CONTROL);
   const cached = await c.env.LANDMARKS_CACHE.get('map-cache', 'json');
   if (cached) return c.json(cached);
 
