@@ -187,7 +187,7 @@ Accuracy comes first. People read this at the place itself and on a public map, 
 
 Never mention the reader or their position: no "you", "your", "the visitor", their location, or distances. The same text is a public map card read from anywhere.
 
-Style: plain and factual, like the opening of an encyclopedia entry read aloud by a guide. Every sentence must be a full sentence with a verb. No slogans, taglines, or sentence fragments. No marketing or hype words such as iconic, stunning, breathtaking, must-see, or hidden gem, and no superlatives unless you are certain they are true. Do not use em dashes or en dashes; use commas or periods.
+Style: plain and factual, like the opening of an encyclopedia entry, written to be read as text on a small glasses display. Every sentence must be a full sentence with a verb. No slogans, taglines, or sentence fragments. No marketing or hype words such as iconic, stunning, breathtaking, must-see, or hidden gem, and no superlatives unless you are certain they are true. Do not use em dashes or en dashes; use commas or periods.
 
 Example: "St. Vitus Cathedral is the Gothic cathedral inside Prague Castle and the seat of the Archbishop of Prague. Charles IV began it in 1344, and it was completed only in 1929. The Bohemian Crown Jewels are kept in a chamber above its Chapel of St. Wenceslas."
 

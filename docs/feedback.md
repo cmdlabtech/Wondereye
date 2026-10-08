@@ -39,7 +39,7 @@ Notes: KV is eventually consistent, so the hour/day limits are approximate
 under bursts; the global daily cap bounds the worst case. (The Workers Rate
 Limiting binding only supports 10 s / 60 s windows.)
 
-## Bindings CMDLAB must provide (nothing has been set)
+## Bindings (the required ones are set in production as of Oct 7, 2026)
 
 Worker `wondereye-api` (`packages/worker/wrangler.jsonc` stays gitignored):
 
