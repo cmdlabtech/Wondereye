@@ -11,7 +11,8 @@ const devHost = process.env.VITE_DEV_IP || env.VITE_DEV_IP || 'localhost';
 
 // Strip files that must never ship: internal docs (public/CLAUDE.md) always;
 // in EHPK builds also _headers and _redirects (Cloudflare files — useless in
-// the .ehpk, and _headers' URLs trip the store's network-whitelist scanner).
+// the .ehpk, and _headers' URLs trip the store's network-whitelist scanner)
+// and the verify frame, which the app loads from wondereye.app instead.
 function stripInternalFiles(isEhpk: boolean): Plugin {
   let config: ResolvedConfig;
   return {
@@ -25,6 +26,9 @@ function stripInternalFiles(isEhpk: boolean): Plugin {
       if (isEhpk) {
         rmSync(resolve(outDir, '_headers'), { force: true });
         rmSync(resolve(outDir, '_redirects'), { force: true });
+        // Turnstile host frame: only meaningful on wondereye.app.
+        rmSync(resolve(outDir, 'verify-frame.html'), { force: true });
+        rmSync(resolve(outDir, 'verify-frame.js'), { force: true });
       }
     },
   };

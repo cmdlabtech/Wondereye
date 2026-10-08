@@ -279,6 +279,9 @@
     #feedback-count { white-space: nowrap; font-variant-numeric: tabular-nums; }
     .feedback-form [hidden] { display: none; }
     #feedback-turnstile { margin-top: 8px; min-height: 65px; }
+    .feedback-verify { display: block; width: 100%; height: 68px; border: 0; background: transparent; }
+    .feedback-fallback { display: block; color: inherit; text-decoration: underline; opacity: 0.7; }
+    .feedback-fallback[hidden] { display: none; }
     #feedback-submit { display: block; width: 100%; margin-top: 8px; padding: 7px 12px; border-color: rgba(255,255,255,0.3); }
     #feedback-submit:disabled { opacity: 0.4; }
   </style>
@@ -358,6 +361,7 @@
           <span id="feedback-count">0 / 2000</span>
         </div>
         <div id="feedback-turnstile"></div>
+        <a class="hint feedback-fallback" id="feedback-fallback" href="https://wondereye.app/map?feedback=1&amp;from=app" target="_blank" rel="noopener noreferrer" data-external data-i18n="p.fbOpenWeb" hidden>Send feedback on wondereye.app instead</a>
         <button type="submit" class="toggle-btn active" id="feedback-submit" disabled data-i18n="p.send">Send</button>
         <p class="hint" id="feedback-status" role="status" aria-live="polite"></p>
       </form>

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Feedback in the glasses app (1.7.1, requires a new Even Hub build)
+- Fixed: Send feedback in the Even Realities App showed "Unable to connect to website" and could not be sent. The verification check now loads from wondereye.app inside the settings page, so it works in the app.
+- If the check still can't load, a link opens the feedback form on wondereye.app instead.
+- wondereye.app/map?feedback=1 opens the feedback form directly.
+
 ### Map (wondereye.app/map)
 - The globe image is now a smaller WebP file (about 310 KB instead of 1.3 MB) and is downloaded once, so the map opens faster, especially on mobile networks.
 - Each selected place now has its own link (for example `wondereye.app/map?p=tour-eiffel`) that opens that place directly, and the browser tab shows the place name.

@@ -2,7 +2,7 @@
 // nothing here holds a secret. The Turnstile sitekey is public by design.
 
 export const TURNSTILE_SITEKEY: string =
-  import.meta.env.VITE_TURNSTILE_SITEKEY || "0x4AAAAAAFQyWWYVPcIJm6E7"; // public Turnstile sitekey (wondereye.app, 127.0.0.1)
+  import.meta.env.VITE_TURNSTILE_SITEKEY || "0x4AAAAAAFQyWWYVPcIJm6E7"; // public Turnstile sitekey (widget hostname: wondereye.app)
 export const FEEDBACK_API: string = import.meta.env.VITE_FEEDBACK_API || "https://api.wondereye.app";
 
 export type FeedbackCategory = "bug" | "idea" | "other";
@@ -46,12 +46,14 @@ export async function sendFeedback(payload: {
   website: string;
   elapsedMs: number;
   turnstileToken: string;
+  /** "app" when the glasses app sent the visitor here (/map?feedback=1&from=app). */
+  source?: "map" | "app";
 }): Promise<{ ok: boolean; error?: string }> {
   try {
     const res = await fetch(`${FEEDBACK_API}/api/feedback`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ ...payload, title: payload.title || undefined, source: "map", page: "/map" }),
+      body: JSON.stringify({ ...payload, title: payload.title || undefined, source: payload.source ?? "map", page: "/map" }),
     });
     const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
     return res.ok && data.ok ? { ok: true } : { ok: false, error: data.error };

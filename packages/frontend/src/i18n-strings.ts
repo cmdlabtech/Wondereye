@@ -73,6 +73,7 @@ const en = {
   "p.fbError": "Feedback couldn't be sent. Please try again later.",
   "p.fbTooMany": "Too many submissions. Please try again later.",
   "p.verifyFail": "Verification could not load. Please try again later.",
+  "p.fbOpenWeb": "Send feedback on wondereye.app instead",
 };
 
 export type StringKey = keyof typeof en;
@@ -147,6 +148,7 @@ export const STRINGS: Record<Lang, Record<StringKey, string>> = {
     "p.fbError": "Feedback konnte nicht gesendet werden. Bitte später erneut versuchen.",
     "p.fbTooMany": "Zu viele Einsendungen. Bitte später erneut versuchen.",
     "p.verifyFail": "Die Überprüfung konnte nicht geladen werden. Bitte später erneut versuchen.",
+    "p.fbOpenWeb": "Feedback stattdessen auf wondereye.app senden",
   },
   fr: {
     "g.finding": "Recherche des lieux à proximité...",
@@ -216,6 +218,7 @@ export const STRINGS: Record<Lang, Record<StringKey, string>> = {
     "p.fbError": "Impossible d'envoyer votre avis. Réessayez plus tard.",
     "p.fbTooMany": "Trop d'envois. Réessayez plus tard.",
     "p.verifyFail": "La vérification n'a pas pu se charger. Réessayez plus tard.",
+    "p.fbOpenWeb": "Envoyer votre avis sur wondereye.app",
   },
   es: {
     "g.finding": "Buscando lugares cercanos...",
@@ -285,6 +288,7 @@ export const STRINGS: Record<Lang, Record<StringKey, string>> = {
     "p.fbError": "No se pudieron enviar los comentarios. Inténtalo más tarde.",
     "p.fbTooMany": "Demasiados envíos. Inténtalo más tarde.",
     "p.verifyFail": "No se pudo cargar la verificación. Inténtalo más tarde.",
+    "p.fbOpenWeb": "Enviar comentarios en wondereye.app",
   },
   it: {
     "g.finding": "Cerco luoghi vicini...",
@@ -354,6 +358,7 @@ export const STRINGS: Record<Lang, Record<StringKey, string>> = {
     "p.fbError": "Impossibile inviare il feedback. Riprova più tardi.",
     "p.fbTooMany": "Troppi invii. Riprova più tardi.",
     "p.verifyFail": "Impossibile caricare la verifica. Riprova più tardi.",
+    "p.fbOpenWeb": "Invia il feedback su wondereye.app",
   },
   zh: {
     "g.finding": "正在查找附近的地标...",
@@ -423,6 +428,7 @@ export const STRINGS: Record<Lang, Record<StringKey, string>> = {
     "p.fbError": "反馈发送失败，请稍后重试。",
     "p.fbTooMany": "提交次数过多，请稍后重试。",
     "p.verifyFail": "验证组件加载失败，请稍后重试。",
+    "p.fbOpenWeb": "改为在 wondereye.app 上发送反馈",
   },
   ja: {
     "g.finding": "周辺の名所を検索中...",
@@ -492,6 +498,7 @@ export const STRINGS: Record<Lang, Record<StringKey, string>> = {
     "p.fbError": "フィードバックを送信できませんでした。しばらくしてからお試しください。",
     "p.fbTooMany": "送信回数が多すぎます。しばらくしてからお試しください。",
     "p.verifyFail": "認証を読み込めませんでした。しばらくしてからお試しください。",
+    "p.fbOpenWeb": "wondereye.app からフィードバックを送信",
   },
   ko: {
     "g.finding": "주변 명소를 찾는 중...",
@@ -561,6 +568,7 @@ export const STRINGS: Record<Lang, Record<StringKey, string>> = {
     "p.fbError": "피드백을 보내지 못했습니다. 나중에 다시 시도해 주세요.",
     "p.fbTooMany": "제출이 너무 많습니다. 나중에 다시 시도해 주세요.",
     "p.verifyFail": "인증을 불러오지 못했습니다. 나중에 다시 시도해 주세요.",
+    "p.fbOpenWeb": "wondereye.app에서 피드백 보내기",
   },
 };
 
