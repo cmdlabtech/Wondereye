@@ -20,8 +20,10 @@ import { useCloseMap, useGlobeSession } from "@/lib/globe-session";
 
 // Locked PayPal donate button (same link as the landing page and /support).
 const DONATE_URL = "https://www.paypal.com/donate/?hosted_button_id=Z5SDZULELYGNS";
-// TODO(CMDLAB): swap in the public Even Hub listing URL once it is known.
-const EVEN_HUB_URL = "/";
+// Wondereye has no public web store listing (it is installed from Even Hub
+// inside the Even Realities App), so link the hardware maker's site instead.
+const EVEN_REALITIES_URL = "https://www.evenrealities.com/";
+const OSM_COPYRIGHT_URL = "https://www.openstreetmap.org/copyright";
 const DEFAULT_TITLE = "Wondereye · A globe of landmarks";
 const SITE = "https://wondereye.app";
 
@@ -523,7 +525,7 @@ export function GlobeView() {
         <FeedbackButton />
         <nav
           aria-label="About Wondereye"
-          className="chrome pointer-events-auto flex h-9 items-center gap-3 rounded-full px-3.5 text-xs text-muted"
+          className="chrome pointer-events-auto flex min-h-9 flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl px-3.5 py-2 text-xs text-muted"
         >
           <a
             href="/"
@@ -536,11 +538,13 @@ export function GlobeView() {
             What&rsquo;s Wondereye?
           </a>
           <a
-            href={EVEN_HUB_URL}
+            href={EVEN_REALITIES_URL}
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 whitespace-nowrap transition-colors hover:text-fg"
           >
             <Glasses className="size-3.5 text-primary" aria-hidden="true" />
-            Get it on Even Hub
+            Made for Even Realities G2
           </a>
           <a
             href={DONATE_URL}
@@ -550,6 +554,14 @@ export function GlobeView() {
           >
             <Heart className="size-3 shrink-0" aria-hidden="true" />
             Support
+          </a>
+          <a
+            href={OSM_COPYRIGHT_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="whitespace-nowrap transition-colors hover:text-fg"
+          >
+            Place data &copy; OpenStreetMap
           </a>
         </nav>
         <p className="hidden px-2 py-1 text-xs text-muted xl:block">

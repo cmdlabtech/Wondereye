@@ -7,6 +7,8 @@ import { cn } from "@/lib/cn";
 
 // Locked PayPal donate button (same link as the glasses app settings page and /support).
 const DONATE_URL = "https://www.paypal.com/donate/?hosted_button_id=Z5SDZULELYGNS";
+const EVEN_REALITIES_URL = "https://www.evenrealities.com/";
+const OSM_COPYRIGHT_URL = "https://www.openstreetmap.org/copyright";
 
 const STEPS = [
   {
@@ -93,8 +95,21 @@ export function LandingPage() {
                 Come take a look.
               </h1>
               <p className="rise rise-3 mt-5 max-w-md text-base leading-relaxed text-muted sm:text-lg">
-                Spin a sunlit earth, tap a mark, and read a short note. These are places people actually stood in
-                front of.
+                Spin a sunlit earth, tap a mark, and read a short note. Each place was found by someone using
+                Wondereye.
+              </p>
+              <p className="rise rise-3 mt-3 max-w-md text-sm leading-relaxed text-muted">
+                Wondereye is an app for{" "}
+                <a
+                  href={EVEN_REALITIES_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-fg underline-offset-4 hover:underline"
+                >
+                  Even Realities G2
+                </a>{" "}
+                smart glasses. It finds landmarks nearby and shows a short note about each one as text on the glasses
+                display. Notes are written by Grok.
               </p>
               <div className="rise rise-4 mt-8 flex flex-wrap items-center gap-3">
                 <button type="button" className="btn btn-solid pr-3.5" onClick={openMap} disabled={!ready}>
@@ -183,10 +198,21 @@ export function LandingPage() {
         <div className="mx-auto flex max-w-6xl flex-col gap-3 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
           <p className="flex items-center gap-2">
             <PinIcon className="h-2.5 text-primary" />
-            Wondereye
+            Wondereye &copy; 2026 CMDLAB LLC
           </p>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
-            <p>Earth: NASA Blue Marble · Drag to orbit · scroll to zoom</p>
+            <p>
+              Earth: NASA Blue Marble · Place data{" "}
+              <a
+                href={OSM_COPYRIGHT_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline-offset-4 hover:text-fg hover:underline"
+              >
+                &copy; OpenStreetMap contributors
+              </a>{" "}
+              · Drag to orbit · scroll to zoom
+            </p>
             <a
               href={DONATE_URL}
               target="_blank"

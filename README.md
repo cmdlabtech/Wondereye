@@ -7,12 +7,14 @@ Discover nearby landmarks through your Even G2 smart glasses. Wondereye finds po
 
 ## Try It on Your Glasses
 
-Scan this QR code from the Even Hub app to load Wondereye on your glasses.
+Wondereye runs on [Even Realities G2](https://www.evenrealities.com/) smart glasses and is installed from Even Hub in the Even Realities App on your phone. The glasses show text only; there is no audio.
+
+Developers with [Even Hub](https://hub.evenrealities.com/) Developer Mode can also load the current web build by scanning this QR code with **Scan QR** in the Even Hub tab:
 
 <p align="center">
-  <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://wondereye.app/app.html" alt="Scan to open Wondereye on your Even G2" width="200" height="200" />
+  <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://wondereye.app/app" alt="QR code for wondereye.app/app" width="200" height="200" />
   <br/>
-  <a href="https://wondereye.app/app.html">wondereye.app/app.html</a>
+  <a href="https://wondereye.app/app">wondereye.app/app</a>
 </p>
 
 ## Features
@@ -20,11 +22,12 @@ Scan this QR code from the Even Hub app to load Wondereye on your glasses.
 - **Automatic landmark detection**: up to 5 nearby landmarks found with OpenStreetMap and Wikipedia place data, ranked by distance and significance
 - **Instant descriptions written by Grok**, with full background details on demand
 - **Compass direction and distance** to each landmark, shown right on the HUD
-- **Voice search** to find a specific landmark hands-free
+- **Voice search**: choose Voice Search and say a landmark name; the glasses microphone records the query and the app finds the match
 - **Adjustable search range** — tighten it for dense city centers or widen it to explore
 - **Community map** — every landmark discovered by the community adds to a shared world map at [wondereye.app/map](https://wondereye.app/map); view your own contributions in the app
 - **Recently viewed** landmarks saved for later
 - **Imperial or metric** units, your choice
+- **Eight languages**: English, German, French, Spanish, Italian, Simplified Chinese, Japanese, and Korean (descriptions are written by Grok in the selected language; only English descriptions are added to the community map)
 
 ## Location
 
@@ -40,6 +43,7 @@ Wondereye gets your position from your phone through the Even Hub SDK (`getAppLo
 
 Open Wondereye's settings from the Even Hub app to:
 
+- Choose the **language**
 - Set your **search radius**
 - Choose **imperial or metric** units
 - Toggle **device location** on/off
@@ -49,7 +53,7 @@ Open Wondereye's settings from the Even Hub app to:
 
 ## Privacy
 
-Your location is obtained on-device via the Even Hub SDK and is used **only** to look up nearby landmarks — it is never written to storage. Landmark cache keys are rounded to ~110m precision. No name, email, or other personal information is collected or stored anywhere in this system. See [`packages/worker/src/CLAUDE.md`](packages/worker/src/CLAUDE.md) for the full data/caching rules.
+Your location is obtained on-device via the Even Hub SDK and is used **only** to look up nearby landmarks — it is never written to storage. Landmark cache keys are rounded to ~110m precision. No name, email, or other personal information is collected or stored anywhere in this system.
 
 ## Development
 
@@ -111,7 +115,7 @@ abuse defenses, every binding, and local preview steps.
 cd packages/worker && npm test   # vitest: validation, rate limit, Turnstile, dedupe
 ```
 
-### Packaging for the Even App Store
+### Packaging for Even Hub
 
 ```bash
 cd packages/frontend && npm run pack   # builds and packs wondereye.ehpk
@@ -124,3 +128,7 @@ npm run deploy            # worker + frontend
 npm run deploy:worker     # worker only
 npm run deploy:frontend   # frontend only
 ```
+
+## Copyright
+
+© 2026 CMDLAB LLC. Place data © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright).
