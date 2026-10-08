@@ -1,13 +1,53 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { List, Loader2, Pause, Play, Search, Shuffle } from "lucide-react";
+import { Glasses, Heart, List, Loader2, Pause, Play, Search, Shuffle } from "lucide-react";
 import { FLY_LANDMARK_DIST, FLY_PLACE_DIST, type MarkerPick } from "@/lib/globe-types";
-import { formatType, landmarkId, TYPE_GROUPS, type Landmark, type TypeGroup } from "@/lib/landmarks";
+import {
+  findBySlug,
+  formatType,
+  landmarkId,
+  landmarkSlug,
+  loadLandmarks,
+  TYPE_GROUPS,
+  type Landmark,
+  type TypeGroup,
+} from "@/lib/landmarks";
 import { Wordmark } from "@/components/wordmark";
 import { PinCard } from "@/components/pin-card";
 import { PlacesPanel } from "@/components/places-panel";
 import { FeedbackButton } from "@/components/feedback-button";
 import { cn } from "@/lib/cn";
 import { useCloseMap, useGlobeSession } from "@/lib/globe-session";
+
+// Locked PayPal donate button (same link as the landing page and /support).
+const DONATE_URL = "https://www.paypal.com/donate/?hosted_button_id=Z5SDZULELYGNS";
+// TODO(CMDLAB): swap in the public Even Hub listing URL once it is known.
+const EVEN_HUB_URL = "/";
+const DEFAULT_TITLE = "Wondereye · A globe of landmarks";
+const SITE = "https://wondereye.app";
+
+function setCanonical(href: string) {
+  const link = document.querySelector<HTMLLinkElement>('link[rel="canonical"]');
+  if (link) link.href = href;
+  const og = document.querySelector<HTMLMetaElement>('meta[property="og:url"]');
+  if (og) og.content = href;
+}
+
+/** Mirror the selected pin into ?p=<slug> and the tab title (no history spam). */
+function syncPinUrl(slug: string | null, name: string | null) {
+  const { pathname, search, hash } = window.location;
+  const params = new URLSearchParams(search);
+  params.delete("p");
+  const rest = params.toString();
+  // Built by hand so "~" and "," stay readable in shared links.
+  const pin = slug ? `p=${encodeURIComponent(slug).replace(/%2C/g, ",")}` : "";
+  const query = [pin, rest].filter(Boolean).join("&");
+  const next = pathname + (query ? `?${query}` : "") + hash;
+  if (next !== pathname + search + hash) {
+    window.history.replaceState(window.history.state, "", next);
+  }
+  document.title = name ? `${name} · Wondereye` : DEFAULT_TITLE;
+  setCanonical(SITE + pathname + (pin ? `?${pin}` : ""));
+}
 
 export function GlobeView() {
   const globe = useGlobeSession((s) => s.globe);
@@ -25,6 +65,9 @@ export function GlobeView() {
   const hoverRef = useRef<MarkerPick | null>(null);
   const visKeyRef = useRef("");
   const visAtRef = useRef(0);
+  const deepLinkRef = useRef<string | null>(
+    typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("p"),
+  );
 
   const [query, setQuery] = useState("");
   const [activeIdx, setActiveIdx] = useState(-1);
@@ -80,6 +123,49 @@ export function GlobeView() {
     setSpinning(false);
     void g.flyTo(lm.lat, lm.lng, FLY_LANDMARK_DIST);
   };
+
+  // Open the pin named in ?p= once the globe is ready. The bundled snapshot
+  // usually has it; otherwise wait for the live list before giving up.
+  useEffect(() => {
+    const slug = deepLinkRef.current;
+    if (!slug || !globe || !ready) return;
+    let alive = true;
+    const tryOpen = (list: Landmark[]) => {
+      if (!alive || deepLinkRef.current !== slug) return true;
+      const hit = findBySlug(list, slug);
+      if (!hit) return false;
+      deepLinkRef.current = null;
+      flyToLandmark(hit);
+      return true;
+    };
+    if (!tryOpen(landmarks)) {
+      void loadLandmarks()
+        .then((list) => {
+          if (!tryOpen(list) && alive) {
+            deepLinkRef.current = null;
+            syncPinUrl(null, null);
+          }
+        })
+        .catch(() => {});
+    }
+    return () => {
+      alive = false;
+    };
+  }, [globe, ready, landmarks]);
+
+  useEffect(() => {
+    if (deepLinkRef.current) return;
+    const lm = pick?.kind === "pin" ? pick.landmark : undefined;
+    syncPinUrl(lm ? landmarkSlug(lm, landmarks) : null, lm?.name ?? null);
+  }, [pick, landmarks]);
+
+  useEffect(
+    () => () => {
+      document.title = DEFAULT_TITLE;
+      setCanonical(`${SITE}/`);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!pending || !globe || !ready) return;
@@ -243,7 +329,8 @@ export function GlobeView() {
     <div className="pointer-events-none">
       <header className={cn("map-chrome-enter pointer-events-none fixed inset-x-0 top-0 p-3 sm:p-4", chromeZ)}>
         <div className="mx-auto flex max-w-6xl items-center gap-2 sm:gap-3">
-          <div className="pointer-events-auto hidden min-w-0 shrink-0 sm:block">
+          <h1 className="sr-only">Wondereye: explore landmarks on an interactive globe</h1>
+          <div className="chrome pointer-events-auto hidden h-12 min-w-0 shrink-0 items-center rounded-full px-4 sm:flex">
             <Wordmark
               to="/"
               size="md"
@@ -255,7 +342,7 @@ export function GlobeView() {
             />
           </div>
 
-          <div className="pointer-events-auto min-w-0 shrink-0 sm:hidden">
+          <div className="chrome pointer-events-auto flex h-12 min-w-0 shrink-0 items-center rounded-full px-3.5 sm:hidden">
             <Wordmark
               to="/"
               size="sm"
@@ -272,6 +359,7 @@ export function GlobeView() {
               <input
                 id="we-search"
                 type="text"
+                aria-label="Search landmarks or places"
                 inputMode="search"
                 value={query}
                 placeholder="Search a landmark or a place…"
@@ -421,19 +509,51 @@ export function GlobeView() {
             onPrev={hopIdx > 0 ? () => flyToLandmark(filtered[hopIdx - 1]) : undefined}
             onNext={hopIdx >= 0 && hopIdx < filtered.length - 1 ? () => flyToLandmark(filtered[hopIdx + 1]) : undefined}
             indexLabel={hopIdx >= 0 ? `${hopIdx + 1} / ${filtered.length}` : undefined}
+            appUrl={EVEN_HUB_URL}
           />
         ) : null}
       </div>
 
       <div
         className={cn(
-          "map-chrome-enter pointer-events-none fixed bottom-[4.9rem] left-3 flex items-end gap-2 md:bottom-3",
+          "map-chrome-enter pointer-events-none fixed bottom-[4.9rem] left-3 flex max-w-[calc(100vw-1.5rem)] flex-wrap-reverse items-end gap-2 md:bottom-3 md:max-w-[calc(100vw-24rem)]",
           panelOpen && "max-md:hidden",
           chromeZ,
         )}
       >
         <FeedbackButton />
-        <p className="hidden px-2 py-1 text-xs text-muted md:block">
+        <nav
+          aria-label="About Wondereye"
+          className="chrome pointer-events-auto flex h-9 items-center gap-3 rounded-full px-3.5 text-xs text-muted"
+        >
+          <a
+            href="/"
+            onClick={(e) => {
+              e.preventDefault();
+              closeMap();
+            }}
+            className="whitespace-nowrap transition-colors hover:text-fg"
+          >
+            What&rsquo;s Wondereye?
+          </a>
+          <a
+            href={EVEN_HUB_URL}
+            className="inline-flex items-center gap-1.5 whitespace-nowrap transition-colors hover:text-fg"
+          >
+            <Glasses className="size-3.5 text-primary" aria-hidden="true" />
+            Get it on Even Hub
+          </a>
+          <a
+            href={DONATE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 whitespace-nowrap font-medium text-primary transition-colors hover:text-primary-dim"
+          >
+            <Heart className="size-3 shrink-0" aria-hidden="true" />
+            Support
+          </a>
+        </nav>
+        <p className="hidden px-2 py-1 text-xs text-muted xl:block">
           Drag to orbit · scroll to zoom · browse the list
         </p>
       </div>

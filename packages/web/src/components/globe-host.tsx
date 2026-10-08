@@ -4,10 +4,7 @@ import type { WonderGlobe } from "@/lib/globe-engine";
 import { loadLandmarks, type Landmark } from "@/lib/landmarks";
 import { useGlobeSession } from "@/lib/globe-session";
 import { applyHeroFrame, applyMapFrame, animateToHero, animateToMap } from "@/lib/globe-morph";
-import { warmEarthImage } from "@/lib/globe-types";
 import { cn } from "@/lib/cn";
-
-warmEarthImage();
 
 const globeEngine = import("@/lib/globe-engine");
 const noop = () => {};

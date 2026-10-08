@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Map (wondereye.app/map)
+- The globe image is now a smaller WebP file (about 310 KB instead of 1.3 MB) and is downloaded once, so the map opens faster, especially on mobile networks.
+- Each selected place now has its own link (for example `wondereye.app/map?p=tour-eiffel`) that opens that place directly, and the browser tab shows the place name.
+- Shared links now display a title, a description, and a preview image.
+- A row at the bottom of the map links to an introduction to Wondereye, the glasses app, and the Support page. Place cards include a link to hear the place on your glasses.
+- The Wondereye name in the map header now has a backdrop so it remains readable over the globe.
+- Site files now use longer browser caching where safe, and the map's offline list of places is refreshed at each release.
+
 ## v1.7.0 - 2026-10-07
 
 ### Languages

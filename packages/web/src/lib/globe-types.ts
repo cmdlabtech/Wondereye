@@ -12,11 +12,7 @@ export type MarkerPick = {
 
 export const FLY_LANDMARK_DIST = 1.42;
 export const FLY_PLACE_DIST = 1.32;
-export const EARTH_URL = "/earth-blue-marble.jpg";
-
-export function warmEarthImage() {
-  if (typeof window === "undefined") return;
-  const img = new Image();
-  img.decoding = "async";
-  img.src = EARTH_URL;
-}
+// Hashed by Vite (served from /assets/ with an immutable cache). index.html
+// preloads this same file with crossorigin="anonymous", matching the
+// TextureLoader's default CORS mode, so the browser fetches it exactly once.
+export { default as EARTH_URL } from "../assets/earth-blue-marble.webp";
