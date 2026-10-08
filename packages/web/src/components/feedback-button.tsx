@@ -12,13 +12,22 @@ const MAX_MESSAGE = 2000;
 const MAX_TITLE = 80;
 const GENERIC_ERROR = "Feedback couldn't be sent. Please try again later.";
 
+// /map?feedback=1 opens the form directly. The glasses app links here
+// (with &from=app) when its in-app verification can't load.
+function feedbackParams(): { open: boolean; fromApp: boolean } {
+  if (typeof window === "undefined") return { open: false, fromApp: false };
+  const q = new URLSearchParams(window.location.search);
+  return { open: q.get("feedback") === "1", fromApp: q.get("from") === "app" };
+}
+
 export function FeedbackButton({ className }: { className?: string }) {
-  const [open, setOpen] = useState(false);
+  const [initial] = useState(feedbackParams);
+  const [open, setOpen] = useState(initial.open);
 
   return (
     <div className={cn("pointer-events-auto", className)}>
       {open ? (
-        <FeedbackForm onClose={() => setOpen(false)} />
+        <FeedbackForm fromApp={initial.fromApp} onClose={() => setOpen(false)} />
       ) : (
         <button
           type="button"
@@ -33,7 +42,7 @@ export function FeedbackButton({ className }: { className?: string }) {
   );
 }
 
-function FeedbackForm({ onClose }: { onClose: () => void }) {
+function FeedbackForm({ fromApp, onClose }: { fromApp: boolean; onClose: () => void }) {
   const [category, setCategory] = useState<FeedbackCategory>("bug");
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
@@ -81,6 +90,7 @@ function FeedbackForm({ onClose }: { onClose: () => void }) {
       website,
       elapsedMs: Date.now() - openedAt.current,
       turnstileToken: token,
+      source: fromApp ? "app" : "map",
     });
     if (res.ok) {
       if (widgetId.current) window.turnstile?.remove(widgetId.current);

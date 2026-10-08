@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <title>Wondereye verification</title>
+  <style>html,body{margin:0;padding:0;background:transparent;overflow:hidden}#ts{min-height:65px}</style>
+</head>
+<body>
+  <!--
+    Turnstile host for the installed glasses app. The app's settings page runs
+    from a loopback origin (http://127.0.0.1:<port>) inside the Even Realities
+    App, which Turnstile can't authorize (hostnames must be real domains). The
+    app embeds this page from wondereye.app instead, so the widget runs on an
+    authorized hostname, and the token is handed to the parent with
+    postMessage. The Worker still verifies every token with siteverify.
+  -->
+  <div id="ts"></div>
+  <script src="/verify-frame.js"></script>
+</body>
+</html>
