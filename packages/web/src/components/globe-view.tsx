@@ -509,7 +509,6 @@ export function GlobeView() {
             onPrev={hopIdx > 0 ? () => flyToLandmark(filtered[hopIdx - 1]) : undefined}
             onNext={hopIdx >= 0 && hopIdx < filtered.length - 1 ? () => flyToLandmark(filtered[hopIdx + 1]) : undefined}
             indexLabel={hopIdx >= 0 ? `${hopIdx + 1} / ${filtered.length}` : undefined}
-            appUrl={EVEN_HUB_URL}
           />
         ) : null}
       </div>

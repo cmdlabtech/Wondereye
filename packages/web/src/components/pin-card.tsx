@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Glasses, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { formatType } from "@/lib/landmarks";
 import type { MarkerPick } from "@/lib/globe-types";
 import { PinIcon } from "@/components/wordmark";
@@ -15,14 +15,12 @@ export function PinCard({
   onPrev,
   onNext,
   indexLabel,
-  appUrl,
 }: {
   pick: MarkerPick;
   onClose: () => void;
   onPrev?: () => void;
   onNext?: () => void;
   indexLabel?: string;
-  appUrl?: string;
 }) {
   const kicker = pick.kind === "geocode" ? "Place" : formatType(pick.landmark?.type ?? "landmark");
   const hop = pick.kind === "pin" && (onPrev || onNext);
@@ -77,15 +75,6 @@ export function PinCard({
           </div>
         ) : null}
       </div>
-      {pick.kind === "pin" && appUrl ? (
-        <a
-          href={appUrl}
-          className="mt-3 inline-flex shrink-0 items-center gap-2 border-t border-border pt-3 text-xs text-ink/65 transition-colors hover:text-primary"
-        >
-          <Glasses className="size-3.5 text-primary" aria-hidden="true" />
-          Hear this on your glasses with Wondereye for Even G2
-        </a>
-      ) : null}
     </article>
   );
 }
