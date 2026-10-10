@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Voice search (server only, no new Even Hub build needed)
+- Fixed: voice search always answered "Speech recognition failed. Please try again." since xAI retired its old transcription address. The server now uses xAI's current speech-to-text service (grok-voice-transcribe-2.0).
+
 ### Feedback in the glasses app (1.7.1, requires a new Even Hub build)
 - Fixed: Send feedback in the Even Realities App showed "Unable to connect to website" and could not be sent. The verification check now loads from wondereye.app inside the settings page, so it works in the app.
 - If the check still can't load, a link opens the feedback form on wondereye.app instead.
