@@ -3,6 +3,7 @@ import { cors } from 'hono/cors';
 import { findNearbyPOIs } from './places';
 import { cleanSnippet, generateDetail, generateSnippets, GROK_MATCH_MODEL } from './grok';
 import { Bindings, LandmarkDetailInput, LandmarkResponse } from './types';
+import { sttRequest, sttText } from './stt';
 import { handleFeedback } from './feedback';
 import { areaCacheKey, detailCacheKey, parseLang, slugify } from './lang';
 
@@ -318,24 +319,15 @@ app.post('/api/transcribe', async (c) => {
     return c.json({ error: 'landmarks must be a non-empty JSON array' }, 400);
   }
 
-  // Forward audio to xAI Whisper-compatible STT endpoint
-  const sttForm = new FormData();
-  sttForm.append('file', audioFile, 'audio.wav');
-  sttForm.append('model', 'whisper-1');
-
+  // Forward audio to xAI speech to text (POST /v1/stt, grok-voice-transcribe-2.0); see stt.ts.
   let transcribedText = '';
   try {
-    const sttRes = await fetch('https://api.x.ai/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${c.env.XAI_API_KEY}` },
-      body: sttForm,
-    });
+    const sttRes = await fetch(...sttRequest(c.env.XAI_API_KEY, audioFile));
     if (!sttRes.ok) {
       console.error('[transcribe] STT error:', sttRes.status, await sttRes.text().catch(() => ''));
       return c.json({ error: 'Speech recognition failed. Please try again.' }, 502);
     }
-    const sttData: any = await sttRes.json();
-    transcribedText = (sttData.text || '').trim();
+    transcribedText = sttText(await sttRes.json());
   } catch (err) {
     console.error('[transcribe] STT fetch error:', err);
     return c.json({ error: 'Speech recognition failed. Please try again.' }, 502);
