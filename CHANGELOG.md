@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Glasses app 1.7.2
+- Same app as 1.7.1, resubmitted after review. The network permission now says what each allowed site is used for (Wondereye API, OpenStreetMap city lookup, and the Cloudflare Turnstile check on wondereye.app).
+- Each package is now checked before it is built, so it can't contain a web address that isn't on the app's network allowlist.
+
 ### Feedback in the glasses app (1.7.1, requires a new Even Hub build)
 - Fixed: Send feedback in the Even Realities App showed "Unable to connect to website" and could not be sent. The verification check now loads from wondereye.app inside the settings page, so it works in the app.
 - If the check still can't load, a link opens the feedback form on wondereye.app instead.
