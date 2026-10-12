@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Glasses app 1.7.2
+- Same app as 1.7.1, resubmitted after review. The network permission now says what each allowed site is used for (Wondereye API, OpenStreetMap city lookup, and the Cloudflare Turnstile check on wondereye.app).
+- Each package is now checked before it is built, so it can't contain a web address that isn't on the app's network allowlist.
+
 ### Voice search (server only, no new Even Hub build needed)
 - Fixed: voice search always answered "Speech recognition failed. Please try again." since xAI retired its old transcription address. The server now uses xAI's current speech-to-text service (grok-voice-transcribe-2.0).
 
