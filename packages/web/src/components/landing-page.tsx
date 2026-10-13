@@ -1,4 +1,5 @@
 import { useLayoutEffect, useMemo, useRef } from "react";
+import { Link } from "@tanstack/react-router";
 import { ArrowRight, Heart } from "lucide-react";
 import { PinIcon, Wordmark } from "@/components/wordmark";
 import { useGlobeSession, useOpenLandmark, useOpenMap } from "@/lib/globe-session";
@@ -213,6 +214,9 @@ export function LandingPage() {
               </a>{" "}
               · Drag to orbit · scroll to zoom
             </p>
+            <Link to="/privacy" className="font-medium text-fg underline-offset-4 hover:underline">
+              Privacy
+            </Link>
             <a
               href={DONATE_URL}
               target="_blank"
