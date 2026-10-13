@@ -40,4 +40,33 @@ describe('GET /api/map caching', () => {
     const res = await get(kv);
     expect(res.headers.get('cache-control')).toBe('public, s-maxage=300, max-age=60');
   });
+
+  it('returns one Eiffel pin when KV holds the English and French names', async () => {
+    const kv = new FakeKV();
+    kv.meta.set('mapplace:eiffel-tower:48.858:2.295', {
+      name: 'Eiffel Tower', type: 'landmark', lat: 48.85822222, lng: 2.2945, snippet: 'The tower.',
+    });
+    kv.meta.set('mapplace:tour-eiffel:48.858:2.295', {
+      name: 'Tour Eiffel', type: 'monument', lat: 48.8582603, lng: 2.2945008, snippet: 'La tour.',
+    });
+    kv.meta.set('mapplace:bureau-de-gustave-eiffel:48.858:2.295', {
+      name: 'Bureau de Gustave Eiffel', type: 'attraction', lat: 48.8582685, lng: 2.2945812, snippet: 'His office.',
+    });
+    const res = await get(kv);
+    const data = (await res.json()) as { landmarks: { name: string }[] };
+    expect(data.landmarks.map((p) => p.name)).toEqual(['Eiffel Tower', 'Bureau de Gustave Eiffel']);
+  });
+
+  it('collapses a translated twin that is still sitting in map-cache', async () => {
+    const kv = new FakeKV();
+    kv.store.set('map-cache', JSON.stringify({
+      landmarks: [
+        { name: 'Tour Eiffel', type: 'monument', lat: 48.8582603, lng: 2.2945008, snippet: 'La tour.' },
+        { name: 'Eiffel Tower', type: 'landmark', lat: 48.85822222, lng: 2.2945, snippet: 'The tower.' },
+      ],
+    }));
+    const res = await get(kv);
+    const data = (await res.json()) as { landmarks: { name: string }[] };
+    expect(data.landmarks.map((p) => p.name)).toEqual(['Eiffel Tower']);
+  });
 });

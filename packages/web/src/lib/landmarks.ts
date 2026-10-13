@@ -1,3 +1,8 @@
+import { dedupePlaces } from "../../../worker/src/place-dedupe.ts";
+
+// The public map can already contain a landmark twice (Eiffel Tower / Tour Eiffel).
+// Fold those before they become two pins. Same rules as the API.
+
 export type Landmark = {
   name: string;
   type: string;
@@ -81,7 +86,7 @@ async function fromSnapshot(): Promise<Landmark[]> {
   const res = await fetch("/landmarks.json");
   if (!res.ok) throw new Error("Couldn't load landmarks");
   const data = (await res.json()) as { landmarks?: Landmark[] };
-  return Array.isArray(data.landmarks) ? data.landmarks : [];
+  return Array.isArray(data.landmarks) ? dedupePlaces(data.landmarks) : [];
 }
 
 const snapshotStart = typeof window === "undefined" ? null : fromSnapshot();
@@ -101,8 +106,9 @@ async function loadLandmarksOnce(onUpdate?: (list: Landmark[]) => void): Promise
       if (live.ok) {
         const data = (await live.json()) as { landmarks?: Landmark[] };
         if (Array.isArray(data.landmarks) && data.landmarks.length) {
-          onUpdate?.(data.landmarks);
-          return data.landmarks;
+          const landmarks = dedupePlaces(data.landmarks);
+          onUpdate?.(landmarks);
+          return landmarks;
         }
       }
     } catch {
