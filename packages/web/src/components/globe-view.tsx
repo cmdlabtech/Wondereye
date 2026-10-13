@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { Glasses, Heart, List, Loader2, Pause, Play, Search, Shuffle } from "lucide-react";
 import { FLY_LANDMARK_DIST, FLY_PLACE_DIST, type MarkerPick } from "@/lib/globe-types";
 import {
@@ -546,6 +547,9 @@ export function GlobeView() {
             <Glasses className="size-3.5 text-primary" aria-hidden="true" />
             Made for Even Realities G2
           </a>
+          <Link to="/privacy" className="whitespace-nowrap transition-colors hover:text-fg">
+            Privacy
+          </Link>
           <a
             href={DONATE_URL}
             target="_blank"
