@@ -4,6 +4,8 @@ export type Landmark = {
   lat: number;
   lng: number;
   snippet: string;
+  /** Anonymous first discoverer, e.g. "Explorer #1234". Absent on older pins. */
+  by?: string;
 };
 
 export function formatType(type: string): string {

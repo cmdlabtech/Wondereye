@@ -43,6 +43,17 @@ interface MapPlace {
   lat: number;
   lng: number;
   snippet: string;
+  /** Anonymous first-discoverer label, e.g. "Explorer #1234" (new records only). */
+  by?: string;
+  /** ISO date of first discovery (new records only). */
+  at?: string;
+}
+
+/** Strict format for the anonymous explorer label sent by the glasses app. */
+const EXPLORER_LABEL_RE = /^Explorer #\d{4}$/;
+
+function parseExplorer(value: unknown): string | undefined {
+  return typeof value === 'string' && EXPLORER_LABEL_RE.test(value) ? value : undefined;
 }
 
 // Write a permanent map record. The full record is duplicated into KV list
@@ -52,11 +63,29 @@ interface MapPlace {
 function putMapPlace(kv: KVNamespace, lm: MapPlace): Promise<void> {
   if (!Number.isFinite(lm.lat) || !Number.isFinite(lm.lng)) return Promise.resolve();
   const entry: MapPlace = { name: lm.name, type: lm.type, lat: lm.lat, lng: lm.lng, snippet: cleanSnippet(lm.snippet || '') };
+  const by = parseExplorer(lm.by);
+  if (by) entry.by = by;
+  if (typeof lm.at === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(lm.at)) entry.at = lm.at;
   const metadata: MapPlace = { ...entry };
   while (new TextEncoder().encode(JSON.stringify(metadata)).length > 1000 && metadata.snippet.length > 0) {
     metadata.snippet = metadata.snippet.slice(0, Math.max(0, metadata.snippet.length - 50)).trim();
   }
   return kv.put(mapPlaceKey(lm.name, lm.lat, lm.lng), JSON.stringify(entry), { metadata });
+}
+
+// First-discovery write: only creates a mapplace: record when none exists,
+// stamping the anonymous explorer label and date. Existing records (and any
+// attribution on them) are never overwritten.
+async function putNewMapPlace(kv: KVNamespace, lm: MapPlace, by: string | undefined): Promise<void> {
+  if (!Number.isFinite(lm.lat) || !Number.isFinite(lm.lng)) return;
+  const existing = await kv.get(mapPlaceKey(lm.name, lm.lat, lm.lng));
+  if (existing !== null) return;
+  const place: MapPlace = { name: lm.name, type: lm.type, lat: lm.lat, lng: lm.lng, snippet: lm.snippet };
+  if (by) {
+    place.by = by;
+    place.at = new Date().toISOString().slice(0, 10);
+  }
+  await putMapPlace(kv, place);
 }
 
 const RATE_LIMIT_WINDOW = 60_000; // 1 minute
@@ -127,6 +156,8 @@ app.post('/api/landmarks', async (c) => {
   // text is ever written to the public map (place:/mapplace: records).
   const lang = parseLang(body.lang);
   const writesMap = lang === 'en';
+  // Optional anonymous label ("Explorer #NNNN"); anything else is ignored.
+  const explorer = parseExplorer(body.explorer);
 
   if (typeof lat !== 'number' || typeof lng !== 'number') {
     return c.json({ error: 'lat and lng are required numbers' }, 400);
@@ -167,7 +198,7 @@ app.post('/api/landmarks', async (c) => {
                 const place = { name: lm.name, type: lm.type, lat: poi.lat, lng: poi.lng, snippet: lm.snippet };
                 return [
                   c.env.LANDMARKS_CACHE.put(placeKey(lm.name), JSON.stringify(place), { expirationTtl: PLACE_TTL }),
-                  putMapPlace(c.env.LANDMARKS_CACHE, place),
+                  putNewMapPlace(c.env.LANDMARKS_CACHE, place, explorer),
                 ];
               })
             );
@@ -181,7 +212,7 @@ app.post('/api/landmarks', async (c) => {
             const exists = await c.env.LANDMARKS_CACHE.get(mapPlaceKey(first.name, first.lat, first.lng));
             if (exists) return;
             await Promise.all(
-              response.landmarks.map(lm => putMapPlace(c.env.LANDMARKS_CACHE, lm))
+              response.landmarks.map(lm => putNewMapPlace(c.env.LANDMARKS_CACHE, lm, explorer))
             );
           })().catch(() => {})
         );
@@ -216,7 +247,7 @@ app.post('/api/landmarks', async (c) => {
           const place = { name: lm.name, type: lm.type, lat: lm.lat, lng: lm.lng, snippet: lm.snippet };
           return [
             c.env.LANDMARKS_CACHE.put(placeKey(lm.name), JSON.stringify(place), { expirationTtl: PLACE_TTL }),
-            putMapPlace(c.env.LANDMARKS_CACHE, place), // no TTL — permanent
+            putNewMapPlace(c.env.LANDMARKS_CACHE, place, explorer), // no TTL — permanent; first discovery only
           ];
         }),
       ])
@@ -420,7 +451,10 @@ app.get('/api/map', async (c) => {
     const dedupeKey = mapPlaceKey(e.name, e.lat, e.lng);
     if (seen.has(dedupeKey)) return false;
     seen.add(dedupeKey);
-    landmarks.push({ name: e.name, type: e.type, lat: e.lat, lng: e.lng, snippet: cleanSnippet(e.snippet || '') });
+    const place: MapPlace = { name: e.name, type: e.type, lat: e.lat, lng: e.lng, snippet: cleanSnippet(e.snippet || '') };
+    const by = parseExplorer(e.by);
+    if (by) place.by = by;
+    landmarks.push(place);
     return true;
   };
 
