@@ -49,6 +49,9 @@ export function PinCard({
           {pick.landmark.snippet}
         </p>
       ) : null}
+      {pick.landmark?.by && /^Explorer #\d{4}$/.test(pick.landmark.by) ? (
+        <p className="mt-2 shrink-0 text-xs tracking-wide text-ink/40">First discovered by {pick.landmark.by}</p>
+      ) : null}
       <div className="mt-3 flex shrink-0 items-center justify-between gap-2">
         <p className="text-xs tracking-wide text-ink/40 tabular-nums">{formatCoord(pick.lat, pick.lng)}</p>
         {hop ? (

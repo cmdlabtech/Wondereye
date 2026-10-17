@@ -2,6 +2,7 @@ import { Landmark } from './types';
 import { API_BASE_URL } from './constants';
 import { getRadius } from './radius';
 import { getLang, t } from './i18n';
+import { getExplorerLabel } from './explorer';
 
 function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371000;
@@ -45,7 +46,7 @@ export async function fetchLandmarks(lat: number, lng: number): Promise<Landmark
     response = await fetch(`${API_BASE_URL}/api/landmarks`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ lat, lng, radius: getRadius(), lang: getLang() }),
+      body: JSON.stringify({ lat, lng, radius: getRadius(), lang: getLang(), explorer: getExplorerLabel() }),
       signal: controller.signal,
     });
   } catch (e) {

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Glasses app 1.7.3: anonymous discoverer label (requires a new Even Hub build, Worker and site deploys)
+- Places that you are the first to discover are now labelled on the map as "First discovered by Explorer #1234". The number is random, is created on your glasses app, and is not linked to your name, Even account, or device.
+- Places added before this release show no label.
+
 ### Glasses app 1.7.2
 - Same app as 1.7.1, resubmitted after review. The network permission now says what each allowed site is used for (Wondereye API, OpenStreetMap city lookup, and the Cloudflare Turnstile check on wondereye.app).
 - Each package is now checked before it is built, so it can't contain a web address that isn't on the app's network allowlist.

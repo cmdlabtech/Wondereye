@@ -41,3 +41,58 @@ describe('GET /api/map caching', () => {
     expect(res.headers.get('cache-control')).toBe('public, s-maxage=300, max-age=60');
   });
 });
+
+describe('anonymous explorer label', () => {
+  it('returns a valid by and drops malformed ones', async () => {
+    const kv = new FakeKV();
+    kv.meta.set('mapplace:a:1.000:2.000', { name: 'A', type: 'museum', lat: 1, lng: 2, snippet: '', by: 'Explorer #0042', at: '2026-10-17' });
+    kv.meta.set('mapplace:b:3.000:4.000', { name: 'B', type: 'museum', lat: 3, lng: 4, snippet: '', by: 'Cameron' });
+    kv.meta.set('mapplace:c:5.000:6.000', { name: 'C', type: 'museum', lat: 5, lng: 6, snippet: '' });
+    const data = (await (await get(kv)).json()) as { landmarks: any[] };
+    const by = Object.fromEntries(data.landmarks.map((l) => [l.name, l.by]));
+    expect(by).toEqual({ A: 'Explorer #0042', B: undefined, C: undefined });
+  });
+
+  async function post(kv: FakeKV, explorer: unknown) {
+    const waits: Promise<unknown>[] = [];
+    const env = { ALLOWED_ORIGIN: 'https://wondereye.app', LANDMARKS_CACHE: kv, XAI_API_KEY: 'unused', DEV: 'true' };
+    const req = new Request('https://api.wondereye.app/api/landmarks', {
+      method: 'POST',
+      headers: { origin: 'https://wondereye.app', 'content-type': 'application/json', 'cf-connecting-ip': `10.0.0.${Math.floor(Math.random() * 250)}` },
+      body: JSON.stringify({ lat: 10, lng: 20, radius: 500, lang: 'en', explorer }),
+    });
+    const res = await app.fetch(req, env, { waitUntil: (p: Promise<unknown>) => waits.push(p), passThroughOnException: () => {} } as unknown as ExecutionContext);
+    await Promise.all(waits);
+    return res;
+  }
+
+
+  it('stamps new records only and never overwrites existing ones', async () => {
+    const kv = new FakeKV();
+    const metaPut = kv.put.bind(kv);
+    (kv as any).put = async (k: string, v: string, o?: { metadata?: unknown }) => { await metaPut(k, v); if (o?.metadata) kv.meta.set(k, o.metadata); };
+    const landmarks = [
+      { name: 'New Place', type: 'museum', lat: 10, lng: 20, snippet: 'n', distance: 0 },
+      { name: 'Old Place', type: 'museum', lat: 10.001, lng: 20.001, snippet: 'o', distance: 1 },
+    ];
+    // Serve the landmark list as a cached area response (backfill path).
+    const realGet = kv.get.bind(kv);
+    (kv as any).get = async (k: string, t?: string) => (k.startsWith('mapplace:') || k.startsWith('place:') ? realGet(k, t) : t === 'json' ? { landmarks } : JSON.stringify({ landmarks }));
+    kv.store.set('mapplace:old-place:10.001:20.001', JSON.stringify({ name: 'Old Place', type: 'museum', lat: 10.001, lng: 20.001, snippet: 'o' }));
+    const res = await post(kv, 'Explorer #1234');
+    expect(res.status).toBe(200);
+    expect(JSON.parse(kv.store.get('mapplace:new-place:10.000:20.000')!)).toMatchObject({ by: 'Explorer #1234', at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) });
+    expect(JSON.parse(kv.store.get('mapplace:old-place:10.001:20.001')!).by).toBeUndefined();
+  });
+
+  it('ignores a malformed explorer value', async () => {
+    const kv = new FakeKV();
+    const landmarks = [{ name: 'Fresh', type: 'museum', lat: 10, lng: 20, snippet: 'f', distance: 0 }];
+    const realGet = kv.get.bind(kv);
+    (kv as any).get = async (k: string, t?: string) => (k.startsWith('mapplace:') ? realGet(k, t) : t === 'json' ? { landmarks } : null);
+    await post(kv, 'Explorer #12345<script>');
+    const rec = JSON.parse(kv.store.get('mapplace:fresh:10.000:20.000')!);
+    expect(rec.by).toBeUndefined();
+    expect(rec.at).toBeUndefined();
+  });
+});
