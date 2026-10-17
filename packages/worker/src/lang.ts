@@ -99,3 +99,8 @@ export function slugify(name: string): string {
   }
   return `n${(hash >>> 0).toString(36)}`;
 }
+
+/** Permanent map record. Rounded coordinates keep same-named places in different cities apart. */
+export function mapPlaceKey(name: string, lat: number, lng: number): string {
+  return `mapplace:${slugify(name)}:${lat.toFixed(3)}:${lng.toFixed(3)}`;
+}

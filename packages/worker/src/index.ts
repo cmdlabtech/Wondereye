@@ -5,7 +5,8 @@ import { cleanSnippet, generateDetail, generateSnippets, GROK_MATCH_MODEL } from
 import { Bindings, LandmarkDetailInput, LandmarkResponse } from './types';
 import { sttRequest, sttText } from './stt';
 import { handleFeedback } from './feedback';
-import { areaCacheKey, detailCacheKey, parseLang, slugify } from './lang';
+import { areaCacheKey, detailCacheKey, mapPlaceKey, parseLang, slugify } from './lang';
+import { dedupePlaces } from './place-dedupe';
 
 const MAX_RADIUS = 2000;
 const MIN_RADIUS = 50;
@@ -27,14 +28,6 @@ function optionalText(value: unknown, max: number): string | undefined {
 
 function placeKey(name: string): string {
   return `place:${slugify(name)}`;
-}
-
-// Permanent map record — no TTL, survives 90-day cache resets.
-// Keyed by slug + rounded coordinates so same-named places worldwide
-// (City Hall, Trinity Church, …) get distinct records instead of
-// overwriting each other.
-function mapPlaceKey(name: string, lat: number, lng: number): string {
-  return `mapplace:${slugify(name)}:${lat.toFixed(3)}:${lng.toFixed(3)}`;
 }
 
 interface MapPlace {
@@ -428,9 +421,19 @@ const LEGACY_MIGRATE_LIMIT = 300;
 // Browsers may reuse the map list for a minute; shared caches for five.
 const MAP_RESPONSE_CACHE_CONTROL = 'public, s-maxage=300, max-age=60';
 
+function asMapPlaces(cached: unknown): MapPlace[] | undefined {
+  if (!cached || typeof cached !== 'object' || !('landmarks' in cached)) return undefined;
+  const list = (cached as { landmarks?: unknown }).landmarks;
+  if (!Array.isArray(list)) return undefined;
+  return list as MapPlace[];
+}
+
 app.get('/api/map', async (c) => {
   c.header('Cache-Control', MAP_RESPONSE_CACHE_CONTROL);
   const cached = await c.env.LANDMARKS_CACHE.get('map-cache', 'json');
+  const cachedPlaces = asMapPlaces(cached);
+  // Dedupe on the way out so a stale map-cache still hides a translated twin.
+  if (cachedPlaces) return c.json({ landmarks: dedupePlaces(cachedPlaces) });
   if (cached) return c.json(cached);
 
   // Paginate through all mapplace: keys (KV list returns max 1000 per call).
@@ -481,7 +484,7 @@ app.get('/api/map', async (c) => {
     c.executionCtx.waitUntil(Promise.all(migrations).catch(() => {}));
   }
 
-  const response = { landmarks };
+  const response = { landmarks: dedupePlaces(landmarks) };
   c.executionCtx.waitUntil(
     c.env.LANDMARKS_CACHE.put('map-cache', JSON.stringify(response), { expirationTtl: MAP_CACHE_TTL })
   );
