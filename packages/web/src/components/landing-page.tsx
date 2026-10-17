@@ -213,6 +213,9 @@ export function LandingPage() {
               </a>{" "}
               · Drag to orbit · scroll to zoom
             </p>
+            <a href="/privacy" className="underline-offset-4 hover:text-fg hover:underline">
+              Privacy
+            </a>
             <a
               href={DONATE_URL}
               target="_blank"

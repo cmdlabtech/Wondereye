@@ -1,6 +1,6 @@
-# Wondereye Privacy Notice (DRAFT, pending approval)
+# Wondereye Privacy Notice
 
-_Last updated: [date of publication]_
+_Last updated: October 17, 2026_
 
 This notice describes the information Wondereye uses and how it is shown on the public map at wondereye.app/map.
 

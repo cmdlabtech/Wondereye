@@ -563,6 +563,9 @@ export function GlobeView() {
           >
             Place data &copy; OpenStreetMap
           </a>
+          <a href="/privacy" className="whitespace-nowrap transition-colors hover:text-fg">
+            Privacy
+          </a>
         </nav>
         <p className="hidden px-2 py-1 text-xs text-muted xl:block">
           Drag to orbit · scroll to zoom · browse the list
