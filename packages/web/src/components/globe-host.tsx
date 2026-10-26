@@ -29,8 +29,9 @@ export function GlobeHost() {
   const openFromSlot = useRef(slot);
   if (mode === "hero" && slot) openFromSlot.current = slot;
 
-  const live = mode === "map" || (mode === "opening" && mapLive);
-  const morphing = mode === "opening" || mode === "closing";
+  const onGlobeRoute = pathname === "/" || pathname === "/map";
+  const live = onGlobeRoute && (mode === "map" || (mode === "opening" && mapLive));
+  const morphing = onGlobeRoute && (mode === "opening" || mode === "closing");
 
   useEffect(() => {
     if (pathname === "/map") {
@@ -179,7 +180,7 @@ export function GlobeHost() {
     };
   }, [mode, setMode]);
 
-  const show = painted && (live || !!slot || morphing);
+  const show = onGlobeRoute && painted && (live || !!slot || morphing);
 
   return (
     <div
@@ -188,10 +189,11 @@ export function GlobeHost() {
         "globe-frame",
         live && "is-live",
         morphing && "is-morphing",
-        mode === "hero" && "is-hero",
+        onGlobeRoute && mode === "hero" && "is-hero",
         show && "is-painted",
+        !onGlobeRoute && "invisible",
       )}
-      aria-hidden={mode === "hero" || (mode === "opening" && !mapLive)}
+      aria-hidden={!onGlobeRoute || mode === "hero" || (mode === "opening" && !mapLive)}
     >
       <div ref={stageRef} className="globe-host" />
     </div>
