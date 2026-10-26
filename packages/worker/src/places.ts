@@ -1,8 +1,8 @@
 import { RawPOI } from './types';
-import { haversineDistance } from './geo';
 import { queryOverpass } from './overpass';
 import { queryWikipediaGeosearch } from './wikipedia';
 import { fetchWikidataDescriptions } from './wikidata';
+import { dedupePlaces } from './place-dedupe';
 
 // Hard ceiling for the whole POI lookup. Grok snippet generation follows, so
 // this plus SNIPPET_TIMEOUT_MS must stay well inside the app's 30 s timeout.
@@ -113,55 +113,16 @@ async function addWikidataHints(pois: RawPOI[]): Promise<void> {
   console.log(`[places] wikidata hints: ${hints.size}/${missing.length} in ${Date.now() - t0} ms`);
 }
 
-/** Loose name key: case/diacritics/punctuation-insensitive, no trailing "(…)" or leading "The". */
-function nameKey(name: string): string {
-  return name
-    .normalize('NFD')
-    .replace(/\p{M}/gu, '')
-    .toLowerCase()
-    .replace(/\s*\([^)]*\)\s*$/, '')
-    .replace(/^the\s+/, '')
-    .replace(/[^\p{L}\p{N}]+/gu, ' ')
-    .trim();
-}
-
-function wikiTitleKey(tag: string | undefined): string | undefined {
-  if (!tag) return undefined;
-  const m = tag.match(/^en:(.+)$/i);
-  return m ? nameKey(m[1].replace(/_/g, ' ')) : undefined;
-}
-
-function isSamePlace(osm: RawPOI, wiki: RawPOI): boolean {
-  // Same Wikidata item: "Tour Eiffel" (OSM, fr tag) and "Eiffel Tower" (en article) are Q243.
-  if (osm.wikidata && wiki.wikidata && osm.wikidata.toUpperCase() === wiki.wikidata.toUpperCase()) return true;
-  const wikiKey = nameKey(wiki.name);
-  if (wikiTitleKey(osm.wikipedia) === wikiKey) return true;
-  const osmKey = nameKey(osm.name);
-  if (!osmKey || !wikiKey) return false;
-  const meters = haversineDistance(osm.lat, osm.lng, wiki.lat, wiki.lng);
-  if (osmKey === wikiKey) return meters <= 1_000;
-  // "St. Mary's Church" vs "St. Mary's Church, Oxford" etc.
-  const contains = osmKey.length >= 4 && wikiKey.length >= 4 && (osmKey.includes(wikiKey) || wikiKey.includes(osmKey));
-  return contains && meters <= 250;
-}
-
 /**
- * Overpass entries win (they carry type, dates, architect…); Wikipedia adds
- * notable places OSM missed and lends its English article title and Wikidata
- * id (identifiers only, never text) to matching OSM entries (matched by
- * Wikidata id, English title, or name plus proximity).
+ * Overpass entries carry type, dates, and architect. Wikipedia adds notable
+ * places OSM missed. Records of one landmark collapse to one pin: a shared
+ * Wikidata id wins, including across languages; otherwise the names must
+ * match (a translated type word counts) and the pins must be close together.
+ * The kept record prefers the Wikidata id and the English name, and keeps
+ * the more specific type and facts.
  */
 export function mergePOIs(osmPois: RawPOI[], wikiPois: RawPOI[]): RawPOI[] {
-  const merged = osmPois.map((p) => ({ ...p }));
-  for (const w of wikiPois) {
-    const match = merged.find((p) => isSamePlace(p, w));
-    if (match) {
-      // Prefer the English title as the identifier Grok sees.
-      if (w.wikipedia && (!match.wikipedia || !/^en:/i.test(match.wikipedia))) match.wikipedia = w.wikipedia;
-      if (!match.wikidata && w.wikidata) match.wikidata = w.wikidata;
-      continue;
-    }
-    merged.push(w);
-  }
-  return merged.sort((a, b) => a.distance - b.distance).slice(0, MAX_CANDIDATES);
+  return dedupePlaces([...osmPois, ...wikiPois])
+    .sort((a, b) => a.distance - b.distance)
+    .slice(0, MAX_CANDIDATES);
 }

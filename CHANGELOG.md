@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Landmark pins (server only, no new Even Hub build needed)
+- A landmark stored under two names, such as Eiffel Tower and Tour Eiffel, now shows as one pin on the glasses list and on the map. Places that merely sit next to it stay separate.
+
 ### Glasses app 1.7.3: anonymous discoverer label (requires a new Even Hub build, Worker and site deploys)
 - Places that you are the first to discover are now labelled on the map as "First discovered by Explorer #1234". The number is random, is created on your glasses app, and is not linked to your name, Even account, or device.
 - Places added before this release show no label.

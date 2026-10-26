@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { findNearbyPOIs } from './places';
 import { cleanSnippet, generateDetail, generateSnippets, GROK_MATCH_MODEL } from './grok';
+import { dedupePlaces } from './place-dedupe';
 import { Bindings, LandmarkDetailInput, LandmarkResponse } from './types';
 import { sttRequest, sttText } from './stt';
 import { handleFeedback } from './feedback';
@@ -179,7 +180,7 @@ app.post('/api/landmarks', async (c) => {
 
   const cached = await c.env.LANDMARKS_CACHE.get(key, 'json');
   if (cached) {
-    const response = cached as LandmarkResponse;
+    const response = dedupeLandmarkResponse(cached as LandmarkResponse);
     if (writesMap && response.landmarks.length > 0) {
       if (response.landmarks[0].lat == null) {
         // Old cached data without coordinates — backfill via the POI lookup
@@ -235,7 +236,7 @@ app.post('/api/landmarks', async (c) => {
   }
 
   try {
-    const landmarks = await generateSnippets(pois, c.env.XAI_API_KEY, { lat: safeLat, lng: safeLng }, lang);
+    const landmarks = dedupePlaces(await generateSnippets(pois, c.env.XAI_API_KEY, { lat: safeLat, lng: safeLng }, lang));
     const response: LandmarkResponse = { landmarks };
     if (landmarks.length === 0) {
       return c.json(response);
@@ -428,10 +429,20 @@ const LEGACY_MIGRATE_LIMIT = 300;
 // Browsers may reuse the map list for a minute; shared caches for five.
 const MAP_RESPONSE_CACHE_CONTROL = 'public, s-maxage=300, max-age=60';
 
+function dedupeLandmarkResponse(response: LandmarkResponse): LandmarkResponse {
+  if (!response || !Array.isArray(response.landmarks)) return response;
+  return { ...response, landmarks: dedupePlaces(response.landmarks) };
+}
+
+function dedupeMapResponse(cached: unknown): { landmarks: MapPlace[] } | unknown {
+  if (!cached || typeof cached !== 'object' || !Array.isArray((cached as { landmarks?: unknown }).landmarks)) return cached;
+  return { landmarks: dedupePlaces((cached as { landmarks: MapPlace[] }).landmarks) };
+}
+
 app.get('/api/map', async (c) => {
   c.header('Cache-Control', MAP_RESPONSE_CACHE_CONTROL);
   const cached = await c.env.LANDMARKS_CACHE.get('map-cache', 'json');
-  if (cached) return c.json(cached);
+  if (cached) return c.json(dedupeMapResponse(cached));
 
   // Paginate through all mapplace: keys (KV list returns max 1000 per call).
   // The landmark record rides in each key's list metadata, so aggregation
@@ -481,7 +492,7 @@ app.get('/api/map', async (c) => {
     c.executionCtx.waitUntil(Promise.all(migrations).catch(() => {}));
   }
 
-  const response = { landmarks };
+  const response = { landmarks: dedupePlaces(landmarks) };
   c.executionCtx.waitUntil(
     c.env.LANDMARKS_CACHE.put('map-cache', JSON.stringify(response), { expirationTtl: MAP_CACHE_TTL })
   );
