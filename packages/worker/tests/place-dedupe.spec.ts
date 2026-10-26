@@ -82,6 +82,35 @@ describe('landmark pin dedupe', () => {
     expect(kept.type).toBe('monument');
   });
 
+  it('does not merge the Colosseum with the Colosseo metro station', () => {
+    const amphitheatre = poi('Colosseo', 41.8910113, 12.4943495, { type: 'viewpoint', distance: 199 });
+    const metro = poi('Colosseo (Rome Metro)', 41.89138889, 12.49138889, {
+      type: 'landmark',
+      wikidata: 'Q1229235',
+      wikipedia: 'en:Colosseo (Rome Metro)',
+      distance: 148,
+    });
+    const names = dedupePlaces([amphitheatre, metro]).map((p) => p.name);
+    expect(names).toEqual(['Colosseo', 'Colosseo (Rome Metro)']);
+  });
+
+  it('still merges a same name whose parenthetical is a translation when the pins are within 50 m', () => {
+    const merged = dedupePlaces([
+      poi('Schola Praeconum', 41.8889, 12.4865, { type: 'archaeological_site' }),
+      poi('Schola Praeconum (Scuola degli Araldi)', 41.88905, 12.4866, { type: 'archaeological_site' }),
+    ]);
+    expect(merged).toHaveLength(1);
+  });
+
+  it('does not merge lettered temples that share only the word temple', () => {
+    const temples = [
+      poi('Tempio B', 41.8953728, 12.4768622, { type: 'archaeological_site' }),
+      poi('Tempio C', 41.8951467, 12.4767716, { type: 'archaeological_site', wikidata: 'Q104586001' }),
+      poi('Tempio D', 41.8949284, 12.4767724, { type: 'archaeological_site' }),
+    ];
+    expect(dedupePlaces(temples).map((p) => p.name)).toEqual(['Tempio B', 'Tempio C', 'Tempio D']);
+  });
+
   it('does not merge other close places, or the same name far apart', () => {
     expect(dedupePlaces([
       poi('Faneuil Hall Marketplace', 42.3600766, -71.0547394, { type: 'attraction' }),

@@ -100,7 +100,10 @@ function rawTokens(name: string): string[] {
   if (!folded) return [];
   const tokens: string[] = [];
   for (const token of folded.split(' ')) {
-    if (token.length <= 1 || ARTICLES.has(token)) continue;
+    // Keep a one-letter designation, even when that letter is also a short
+    // article ("d"). "Tempio B", "Tempio C", and "Tempio D" are different
+    // temples; dropping the letter made every key just "temple".
+    if (!token || (token.length > 1 && ARTICLES.has(token))) continue;
     tokens.push(token);
   }
   return tokens;
@@ -122,11 +125,23 @@ function wikiTitle(tag: string | undefined): string | undefined {
   return match ? match[1].replace(/_/g, ' ') : undefined;
 }
 
+/** Case and punctuation folded, with a parenthetical disambiguator kept.
+ *  "Colosseo (Rome Metro)" is the station, not the article titled "Colosseo". */
+function wikiLinkKey(name: string): string {
+  return name
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function wikipediaLinks(a: PlaceIdentity, b: PlaceIdentity): boolean {
   const left = wikiTitle(a.wikipedia);
   const right = wikiTitle(b.wikipedia);
-  if (left && looseNameKey(left) === looseNameKey(b.name)) return true;
-  if (right && looseNameKey(right) === looseNameKey(a.name)) return true;
+  if (left && wikiLinkKey(left) === wikiLinkKey(b.name)) return true;
+  if (right && wikiLinkKey(right) === wikiLinkKey(a.name)) return true;
   return false;
 }
 
@@ -143,9 +158,16 @@ export function isSamePlace(a: PlaceIdentity, b: PlaceIdentity): boolean {
   const meters = haversineDistance(a.lat, a.lng, b.lat, b.lng);
   const left = looseNameKey(a.name);
   const right = looseNameKey(b.name);
-  if (left && left === right && meters <= SAME_NAME_METERS) return true;
-  const qualifiedLeft = looseNameKey(a.name.replace(/,\s*\S+$/, ''));
-  const qualifiedRight = looseNameKey(b.name.replace(/,\s*\S+$/, ''));
+  const strictLeft = wikiLinkKey(a.name);
+  const strictRight = wikiLinkKey(b.name);
+  if (strictLeft && strictLeft === strictRight && meters <= SAME_NAME_METERS) return true;
+  // looseNameKey drops a trailing "(…)". That is a translation glued onto the
+  // same name ("Schola Praeconum (Scuola degli Araldi)") only at the short
+  // distance used for translated type words. Out to 1 km it would also fold
+  // "Colosseo (Rome Metro)" into the Colosseum.
+  if (left && left === right && strictLeft !== strictRight && meters <= TRANSLATED_NAME_METERS) return true;
+  const qualifiedLeft = wikiLinkKey(a.name.replace(/,\s*\S+$/, ''));
+  const qualifiedRight = wikiLinkKey(b.name.replace(/,\s*\S+$/, ''));
   if (qualifiedLeft && qualifiedLeft === qualifiedRight && meters <= QUALIFIED_NAME_METERS) return true;
   const canonicalLeft = canonicalNameKey(a.name);
   const canonicalRight = canonicalNameKey(b.name);
