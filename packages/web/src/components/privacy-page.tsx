@@ -71,8 +71,9 @@ export function PrivacyPage() {
             </p>
             <h1 className="rise rise-2 mt-5 text-5xl leading-[1.05] text-fg sm:text-6xl">Privacy</h1>
             <p className="rise rise-3 mt-5 text-base leading-relaxed text-muted sm:text-lg">
-              Wondereye is a landmark guide for Even Realities G2 glasses, and a public globe of places at
-              wondereye.app. CMDLAB LLC operates it. This page describes what that software does with information.
+              Wondereye is a landmark guide for Even Realities G2 glasses, with a public globe of places at
+              wondereye.app. It is built and run by CMDLAB LLC, and this policy explains what information the app
+              and website use, where that information goes, and the choices you have.
             </p>
             <p className="mt-3 text-sm leading-relaxed text-muted">
               Effective date:{" "}
