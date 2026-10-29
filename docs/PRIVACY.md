@@ -2,7 +2,7 @@
 
 The public page is the site route `/privacy` (`packages/web/src/components/privacy-page.tsx`). This file is the same policy in Markdown. CMDLAB LLC operates Wondereye. Contact: contact@cmdlab.tech.
 
-Effective date: [merge date]
+Effective date: October 29, 2026
 
 ## Location
 

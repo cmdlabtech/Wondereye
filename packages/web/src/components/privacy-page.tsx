@@ -7,7 +7,7 @@ const PAGE_TITLE = "Privacy · Wondereye";
 const CANONICAL = "https://wondereye.app/privacy";
 
 // Placeholder until this page is merged. Replace the bracketed text with that calendar date.
-const EFFECTIVE_DATE = "[merge date]";
+const EFFECTIVE_DATE = "October 29, 2026";
 
 const SECTIONS = [
   { id: "location", label: "Location" },
