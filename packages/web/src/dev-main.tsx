@@ -10,6 +10,7 @@ import {
 import { GlobeHost } from "@/components/globe-host";
 import { LandingPage } from "@/components/landing-page";
 import { GlobeView } from "@/components/globe-view";
+import { PrivacyPage } from "@/components/privacy-page";
 import { AppErrorComponent } from "@/lib/error-component";
 import "./styles.css";
 
@@ -34,8 +35,14 @@ const mapRoute = createRoute({
   component: GlobeView,
 });
 
+const privacyRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/privacy",
+  component: PrivacyPage,
+});
+
 const router = createRouter({
-  routeTree: rootRoute.addChildren([indexRoute, mapRoute]),
+  routeTree: rootRoute.addChildren([indexRoute, mapRoute, privacyRoute]),
   defaultErrorComponent: AppErrorComponent,
 });
 
