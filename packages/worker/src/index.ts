@@ -106,6 +106,11 @@ function checkRateLimit(ip: string): boolean {
   return true;
 }
 
+// Keep only "Grok API error: <status>"; the response body after the dash can echo part of the key.
+function grokErrorSummary(err: unknown): string {
+  return (err instanceof Error ? err.message : String(err)).split(' — ')[0];
+}
+
 const app = new Hono<{ Bindings: Bindings }>();
 
 app.use('/*', async (c, next) => {
@@ -255,7 +260,7 @@ app.post('/api/landmarks', async (c) => {
     );
     return c.json(response);
   } catch (err) {
-    console.error('[api] Grok error:', err);
+    console.error('[api] Grok error:', grokErrorSummary(err));
     return c.json({ error: 'Failed to generate landmark info. Please try again.' }, 502);
   }
 });
@@ -316,7 +321,7 @@ app.post('/api/landmark-detail', async (c) => {
     }
     return c.json({ detail: text });
   } catch (err) {
-    console.error('[api] landmark-detail error:', err);
+    console.error('[api] landmark-detail error:', grokErrorSummary(err));
     return c.json({ detail: '' });
   }
 });
@@ -412,7 +417,7 @@ app.post('/api/transcribe', async (c) => {
       }
     }
   } catch (err) {
-    console.error('[transcribe] Grok match error:', err);
+    console.error('[transcribe] Grok match error:', grokErrorSummary(err));
     // Fall through with matched = null — caller gets the transcription without a match
   }
 
